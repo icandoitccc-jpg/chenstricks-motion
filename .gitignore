@@ -4,3 +4,6 @@ build/
 preview-dist/
 *.log
 .DS_Store
+artifacts/
+artifacts-q/
+out-q/
