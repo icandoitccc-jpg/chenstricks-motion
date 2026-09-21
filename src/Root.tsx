@@ -19,13 +19,16 @@ export const RemotionRoot: React.FC = () => {
         height={1080}
         fps={30}
         durationInFrames={300}
-        defaultProps={{spec: demoSpec as unknown as AnimSpec}}
-        calculateMetadata={({props}) => ({
-          durationInFrames: props.spec.meta.durationInFrames,
-          width: props.spec.meta.width,
-          height: props.spec.meta.height,
-          fps: props.spec.meta.fps,
-        })}
+        defaultProps={{spec: (demoSpec as {spec: unknown}).spec as AnimSpec}}
+        calculateMetadata={({props}) => {
+          const spec = (props as {spec?: AnimSpec})?.spec ?? (demoSpec as {spec: AnimSpec}).spec;
+          return {
+            durationInFrames: spec.meta.durationInFrames,
+            width: spec.meta.width,
+            height: spec.meta.height,
+            fps: spec.meta.fps,
+          };
+        }}
       />
       <Composition
         id="ImageFocus"

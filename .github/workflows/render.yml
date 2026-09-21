@@ -77,12 +77,16 @@ jobs:
       - name: 渲染 ${{ steps.decide.outputs.jobname }}
         env:
           JOB: ${{ steps.decide.outputs.jobname }}
-        run: node scripts/render.mjs
+        run: |
+          mkdir -p out/${{ steps.decide.outputs.jobname }}
+          node scripts/render.mjs 2>&1 | tee out/${{ steps.decide.outputs.jobname }}/render.log
 
       - name: 统计本任务消耗
+        if: always()
         run: echo "本任务墙钟 ${SECONDS}s，按 GitHub 计费向上取整 ≈ $(( SECONDS / 60 + 1 )) Actions 分钟"
 
-      - name: 上传产物
+      - name: 上传产物（含失败日志）
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: out-${{ steps.decide.outputs.jobname }}-${{ github.run_id }}

@@ -62,6 +62,7 @@ interface Motion {
   scale: number;
   clipPath?: string;
   background?: string;
+  highlightClip?: string;
   color?: string;
   typeInRatio?: number; // typeIn：显示字符比例
   hidden: boolean;
@@ -146,7 +147,7 @@ function computeMotion(
         if (t < 0) break;
         const p = easeOut(t);
         m.background = a.color ?? 'rgba(250,204,21,0.85)';
-        m.clipPath = `inset(0 ${(1 - p) * 100}% 0 0 round 4px)`;
+        m.highlightClip = `inset(0 ${(1 - p) * 100}% 0 0 round 4px)`;
         break;
       }
       case 'move': {
@@ -328,13 +329,13 @@ const ElementView: React.FC<{
       );
     }
     if (m.background) {
-      // highlight：文字背后的色块扫入
+      // highlight：文字背后的色块扫入（clip 只作用于色块，不裁剪文字本身）
       return (
-        <div style={common}>
+        <div style={{...common, clipPath: undefined}}>
           <span style={{ position: 'relative', display: 'inline-block' }}>
             <span style={{
               position: 'absolute', inset: '-2px -6px', background: m.background,
-              clipPath: m.clipPath, zIndex: -1, borderRadius: 4,
+              clipPath: m.highlightClip, zIndex: -1, borderRadius: 4,
             }} />
             {el.text}
           </span>
