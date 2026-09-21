@@ -3,7 +3,7 @@
   "description": "画质档位 Q4「4:4:4 色度」：与 Q3 完全相同（画面/动画/1080p30/CRF8/png 无损中间帧/preset slow），唯一差别：yuv444p 色度采样",
   "concurrency": 2,
   "stills": [175],
-  "encode": { "crf": 8, "imageFormat": "png", "x264Preset": "slow", "chromaSubsampling": "yuv444p" },
+  "encode": { "crf": 8, "imageFormat": "png", "x264Preset": "slow", "pixelFormat": "yuv444p" },
   "inputProps": {
     "kind": "comparison",
     "title": "两种获取答案的方式",
