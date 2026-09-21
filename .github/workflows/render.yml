@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        job: [chain-b-q1, chain-b-q2, chain-b-q3]
+        job: [chain-b-q4]
     steps:
       - uses: actions/checkout@v4
 
