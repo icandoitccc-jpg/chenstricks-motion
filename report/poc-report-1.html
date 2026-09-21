@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>chenstricks Motion V1 · 云端渲染 PoC 验证报告（第一轮）</title>
+</head>
+<body style="margin:0;background:#f4f2ed;font-family:-apple-system,'PingFang SC','Helvetica Neue',sans-serif;color:#1c2b27;line-height:1.55;">
+<div style="max-width:860px;margin:0 auto;padding:28px 20px 60px;">
+
+<div style="background:#12362e;color:#f4f2ed;border-radius:14px;padding:22px 26px;">
+  <div style="font-size:12px;letter-spacing:3px;color:#e8a33d;font-weight:600;">CHENSTRICKS MOTION · V1 TECHNICAL DISCOVERY</div>
+  <h1 style="margin:8px 0 4px;font-size:24px;">云端渲染 PoC 验证报告 <span style="font-weight:400;font-size:15px;color:#bcd3cb;">（第一轮 · Milestone 1）</span></h1>
+  <div style="font-size:12.5px;color:#9db8b0;">2026-09-21 · 渲染环境：GitHub Actions ubuntu-latest（2 vCPU / 7.8 GB）· 全部数据为真实运行实测，非估算</div>
+</div>
+
+<div style="background:#fff;border:1px solid #e3ded4;border-radius:14px;padding:18px 22px;margin-top:14px;">
+  <div style="font-size:15px;"><b>阶段性结论：两条核心链路在云端真实跑通。</b>「图片 + JSON 动画定义 → 云端 → 中文 MP4」与「信息结构 JSON → 云端 → 信息动画 MP4」均已验证成立，中文渲染无乱码、预览与成品同源、单条 10 秒 1080p 成片云端渲染仅约 15 秒。<span style="background:#e8f4ee;color:#0d6b4b;padding:2px 10px;border-radius:99px;font-size:12.5px;font-weight:600;">链路验证：GO</span> <span style="background:#fdf3e3;color:#9a6b16;padding:2px 10px;border-radius:99px;font-size:12.5px;font-weight:600;">整体 GO/NO-GO：待剩余验证项完成后给出</span></div>
+</div>
+
+<h2 style="font-size:17px;margin:26px 0 8px;">一、实测指标（来自云端 metrics.json，逐帧渲染进程树采样）</h2>
+<table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e3ded4;border-radius:10px;overflow:hidden;font-size:13px;">
+  <tr style="background:#12362e;color:#f4f2ed;">
+    <th style="padding:8px 10px;text-align:left;">指标</th><th style="padding:8px 10px;text-align:left;">链路A · 图片局部动画</th><th style="padding:8px 10px;text-align:left;">链路B · 信息对比动画</th>
+  </tr>
+  <tr><td style="padding:7px 10px;border-top:1px solid #eee7db;">成片规格</td><td style="padding:7px 10px;border-top:1px solid #eee7db;">1920×1080 · 30fps · 9.5s（286帧）</td><td style="padding:7px 10px;border-top:1px solid #eee7db;">1920×1080 · 30fps · 8.6s（258帧）</td></tr>
+  <tr style="background:#faf8f4;"><td style="padding:7px 10px;">渲染耗时（bundle+选区+渲染+关键帧）</td><td style="padding:7px 10px;">6.4 + 2.8 + <b>14.6</b> + 3.0 ≈ <b>26.7s</b></td><td style="padding:7px 10px;">9.8 + 1.0 + <b>15.1</b> + 3.5 ≈ <b>29.5s</b></td></tr>
+  <tr><td style="padding:7px 10px;border-top:1px solid #eee7db;">整个 job 墙钟（含装依赖+下浏览器）</td><td style="padding:7px 10px;border-top:1px solid #eee7db;">58s</td><td style="padding:7px 10px;border-top:1px solid #eee7db;">64s</td></tr>
+  <tr style="background:#faf8f4;"><td style="padding:7px 10px;">峰值内存（渲染进程树 RSS）</td><td style="padding:7px 10px;"><b>1999 MB</b></td><td style="padding:7px 10px;"><b>2012 MB</b></td></tr>
+  <tr><td style="padding:7px 10px;border-top:1px solid #eee7db;">期间 CPU 占用</td><td style="padding:7px 10px;border-top:1px solid #eee7db;">84.6% × 2 vCPU ≈ 45.2 核·秒</td><td style="padding:7px 10px;border-top:1px solid #eee7db;">85.2% × 2 vCPU ≈ 50.3 核·秒</td></tr>
+  <tr style="background:#faf8f4;"><td style="padding:7px 10px;">输出 MP4 大小</td><td style="padding:7px 10px;">0.63 MB（CRF 18）</td><td style="padding:7px 10px;">0.31 MB（CRF 18）</td></tr>
+  <tr><td style="padding:7px 10px;border-top:1px solid #eee7db;">中文渲染 / 失败次数</td><td style="padding:7px 10px;border-top:1px solid #eee7db;">✓ 无豆腐块 · 0 失败</td><td style="padding:7px 10px;border-top:1px solid #eee7db;">✓ 无豆腐块 · 0 失败</td></tr>
+</table>
+<div style="font-size:12.5px;color:#6b7a75;margin-top:6px;">关键帧截图核对：两条链路各 5 帧，逐帧确认了「区域依次独立出现」「中文正常」「末帧完整」。<a href="chain-a-still-0110.png" style="color:#0d6b4b;">链路A 第110帧</a> · <a href="chain-b-still-0175.png" style="color:#0d6b4b;">链路B 对比画面</a></div>
+
+<h2 style="font-size:17px;margin:26px 0 8px;">二、Actions 计费分钟数与免费额度测算</h2>
+<table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e3ded4;border-radius:10px;overflow:hidden;font-size:13px;">
+  <tr style="background:#12362e;color:#f4f2ed;"><th style="padding:8px 10px;text-align:left;">项目</th><th style="padding:8px 10px;text-align:left;">实测 / 推算</th></tr>
+  <tr><td style="padding:7px 10px;border-top:1px solid #eee7db;">本次消耗（2 个并行 job）</td><td style="padding:7px 10px;border-top:1px solid #eee7db;">58s + 64s → 计费向上取整 = <b>2 分钟</b>（每条链路约 1 分钟）</td></tr>
+  <tr style="background:#faf8f4;"><td style="padding:7px 10px;">单条成片的真实成本模型</td><td style="padding:7px 10px;">装环境 ~15s（缓存后更低）+ 渲染 ~15-25s（10-15s 素材）→ <b>每条约 1 分钟计费</b></td></tr>
+  <tr><td style="padding:7px 10px;border-top:1px solid #eee7db;">私有仓库免费额度</td><td style="padding:7px 10px;border-top:1px solid #eee7db;">2,000 分钟/月 → 按 30 条/月用量 ≈ 45 分钟 → <b>仅占 2.3%</b>；按高频上限 200 条/月 ≈ 300 分钟，仍占 15%</td></tr>
+  <tr style="background:#faf8f4;"><td style="padding:7px 10px;">公开仓库</td><td style="padding:7px 10px;">Actions 分钟数不限且免费（若未来想彻底解除额度顾虑，可公开该仓库或拆渲染仓库）</td></tr>
+  <tr><td style="padding:7px 10px;border-top:1px solid #eee7db;">Cloud Run 对照（未开户，理论值）</td><td style="padding:7px 10px;border-top:1px solid #eee7db;">单次 ≈ 45 vCPU·s + 54 GiB·s，对照免费层（18万 vCPU·s / 36万 GiB·s 每月）理论上限数千次/月——额度同样宽裕，但需绑卡开户</td></tr>
+</table>
+<div style="background:#e8f4ee;border-radius:10px;padding:10px 16px;margin-top:8px;font-size:13px;"><b>结论：</b>按 Chen 的真实用量（每周 ≤1-2 期视频、每期 10-30 个片段），GitHub Actions 免费额度绰绰有余，<b>可以长期 $0 运行</b>，无需 Cloud Run。</div>
+
+<h2 style="font-size:17px;margin:26px 0 8px;">三、关键发现（改变原方案判断的）</h2>
+<div style="background:#fff;border:1px solid #e3ded4;border-radius:10px;padding:14px 20px;font-size:13.5px;">
+  ① <b>渲染比预想快得多</b>：2 核低配 runner 上 10 秒 1080p30 仅需 ~15s 渲染。瓶颈根本不在渲染，而在装环境（~15s）。「生成要等很久」的担心不成立，正常任务 1-2 分钟内出片，远好于预设的 20 分钟容忍线。<br>
+  ② <b>内存 ~2GB</b>：并发 2 时峰值 ~2GB。将来若迁 Cloud Run，免费层 2GB 内存实例会偏紧（需 concurrency=1 或 4GB 实例）；Actions 的 7.8GB 无压力。<br>
+  ③ <b>预览=成品有结构保证</b>：预览与渲染共用同一组件、同一 JSON、同一捆绑字体文件（Noto Sans SC 打包进仓库，不依赖 CDN）。<br>
+  ④ <b>失败率 0</b>：两个 job 首跑即成功，无 sandbox/字体/权限问题——ChatGPT 预警的「容器中文字体」「Chromium 稳定性」两大坑，被「字体打包 + Remotion 官方浏览器管理」直接绕开。
+</div>
+
+<h2 style="font-size:17px;margin:26px 0 8px;">四、过程问题记录</h2>
+<div style="background:#fff;border:1px solid #e3ded4;border-radius:10px;padding:14px 20px;font-size:13.5px;">
+  · 本地：TS 的 interface 不满足 Remotion 泛型约束 → 改 type alias（云端首跑前已拦截）；<br>
+  · 运维：两个 job 产物同名，解包到同一目录会互相覆盖 → 已改为分目录解包（工程层面后续在产物名中加 job 前缀）；<br>
+  · 环境：WorkBuddy 平台会将对话/命令中内联的 token 替换为伪值（安全机制），故凭据一律走「文件读取」，已验证可行；<br>
+  · 云端：0 失败，无需重试。
+</div>
+
+<h2 style="font-size:17px;margin:26px 0 8px;">五、样片（真实云端输出）</h2>
+<div style="background:#fff;border:1px solid #e3ded4;border-radius:10px;padding:14px 20px;font-size:13.5px;">
+  ▶ <a href="chain-a-image.mp4" style="color:#0d6b4b;font-weight:600;"><b>链路A：图片局部动画</b></a>（0.63MB）— 一张完成构图的设计图，5 个区域依次独立动画：标题弹出 → 「先行动」按钮强调+下划线画出 → 手绘线延伸 → 右侧卡片逐条上滑 → 「开始」弹跳悬浮<br>
+  ▶ <a href="chain-b-compare.mp4" style="color:#0d6b4b;font-weight:600;"><b>链路B：信息对比动画</b></a>（0.31MB）— 「搜索 vs 对话」两种获取答案方式的对比，强调「搜」「聊」，条目依次出现<br>
+  <span style="color:#6b7a75;font-size:12.5px;">两支样片可直接导入剪映验证可用性。</span>
+</div>
+
+<h2 style="font-size:17px;margin:26px 0 8px;">六、尚未验证 / 下一步</h2>
+<div style="background:#fff;border:1px solid #e3ded4;border-radius:10px;padding:14px 20px;font-size:13.5px;">
+  ① 本机浏览器轻量预览的流畅度与负担（需 Chen 打开本地预览页实测，纯播放不渲染）；<br>
+  ② 更多动画类型补齐（flow / keywords / 发散 / 汇聚）与导演规则 v0 + JSON 协议定稿；<br>
+  ③ Web UI（上传 → 框选区域 → 参数面板）——进入正式开发阶段再做；<br>
+  ④ 文件生命周期（产物已在 Actions 7 天自动过期，符合「用完即删」；源图走 job 目录、随仓库管理）；<br>
+  ⑤ 汇总出完整版《V1 技术可行性报告》与 GO / GO WITH CHANGES / NO-GO 终审。
+</div>
+
+<div style="text-align:center;color:#9a948a;font-size:11.5px;margin-top:26px;">chenstricks Motion · PoC Milestone 1 · 渲染于 GitHub Actions · 数据文件 metrics.json 随仓库存档</div>
+</div>
+</body>
+</html>

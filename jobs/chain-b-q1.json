@@ -1,0 +1,15 @@
+{
+  "composition": "InfoCompare",
+  "description": "画质档位 Q1「高清」：画面/动画与 chain-b-compare 完全一致，仅提升编码质量。h264 CRF14 / jpeg q95 中间帧 / preset medium",
+  "concurrency": 2,
+  "stills": [175],
+  "encode": { "crf": 14, "imageFormat": "jpeg", "jpegQuality": 95, "x264Preset": "medium" },
+  "inputProps": {
+    "kind": "comparison",
+    "title": "两种获取答案的方式",
+    "left": { "title": "搜索", "steps": ["提问", "答案", "结束"] },
+    "right": { "title": "对话", "steps": ["提问", "回答", "新问题", "继续问"] },
+    "emphasis": ["搜", "聊"],
+    "outro": "搜完就停 vs 越聊越深"
+  }
+}

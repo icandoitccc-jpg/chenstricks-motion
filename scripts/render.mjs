@@ -29,6 +29,13 @@ fs.mkdirSync(outDir, {recursive: true});
 const concurrency = Number(job.concurrency ?? process.env.REMOTION_CONCURRENCY ?? 2);
 const stills = Array.isArray(job.stills) ? job.stills : [];
 
+// 编码参数（可被 job.encode 覆盖；默认值与 PoC 首轮一致）
+const enc = job.encode ?? {};
+const crf = enc.crf ?? 18;
+const imageFormat = enc.imageFormat ?? 'jpeg';
+const jpegQuality = enc.jpegQuality ?? 92;
+const x264Preset = enc.x264Preset ?? 'medium';
+
 const summaryLines = [];
 const say = (line) => {
   summaryLines.push(line);
@@ -75,6 +82,7 @@ say('');
 say(`- 任务: ${job.description ?? ''}`);
 say(`- Runner: ${os.platform()} ${os.arch()}, ${os.cpus().length} vCPU, ${(os.totalmem() / 1024 ** 3).toFixed(1)} GB RAM`);
 say(`- concurrency: ${concurrency}`);
+say(`- 编码: h264 CRF ${crf} / 中间帧 ${imageFormat}${imageFormat === 'jpeg' ? ' q' + jpegQuality : ' (无损)'} / x264 preset ${x264Preset}`);
 
 const bundleStart = Date.now();
 const serveUrl = await bundle({
@@ -106,9 +114,10 @@ await renderMedia({
   outputLocation: mp4Path,
   inputProps: job.inputProps,
   concurrency,
-  imageFormat: 'jpeg',
-  jpegQuality: 92,
-  crf: 18,
+  imageFormat,
+  jpegQuality,
+  crf,
+  x264Preset,
   overwrite: true,
   onProgress: (p) => {
     const now = Date.now();
@@ -147,10 +156,13 @@ const busyDelta = cpuEnd.busy - cpuStart.busy;
 const cpuBusyPercent = totalDelta > 0 ? (busyDelta / totalDelta) * 100 : 0;
 
 const outputBytes = fs.statSync(mp4Path).size;
+const bitrateKbps = +(((outputBytes * 8) / (composition.durationInFrames / composition.fps)) / 1000).toFixed(0);
 const metrics = {
   job: JOB,
   composition: job.composition,
   description: job.description ?? '',
+  encode: {codec: 'h264', crf, imageFormat, jpegQuality: imageFormat === 'jpeg' ? jpegQuality : null, x264Preset, chroma: 'yuv420p'},
+  bitrateKbps,
   startedAt,
   finishedAt: new Date().toISOString(),
   bundleMs,
@@ -187,6 +199,8 @@ say(`| 整任务墙钟 | ${(metrics.totalMs / 1000).toFixed(1)}s |`);
 say(`| 峰值内存(渲染进程树) | ${metrics.peakRssMB} MB |`);
 say(`| 期间整机 CPU 占用 | ${metrics.cpuBusyPercent}% × ${metrics.runner.vcpus} vCPU（≈${metrics.cpuCoreSeconds} 核·秒） |`);
 say(`| 输出大小 | ${metrics.outputMB} MB |`);
+say(`| 编码参数 | h264 CRF ${crf} / 中间帧 ${imageFormat} / preset ${x264Preset} |`);
+say(`| 实际码率 | ${bitrateKbps} kbps |`);
 say(`| 关键帧 | ${stillFiles.join(', ') || '无'} |`);
 say('');
 console.log('metrics ->', path.join(outDir, 'metrics.json'));
