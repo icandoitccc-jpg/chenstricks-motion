@@ -1,0 +1,76 @@
+{
+  "composition": "Spec",
+  "description": "统一引擎验证B：功能B式信息动画（typeIn标题 + chip弹出 + stagger双列 + connectArrow生长 + highlight + circleMark + 镜头推拉 + fadeOut）",
+  "concurrency": 2,
+  "stills": [40, 110, 190, 250, 320],
+  "encode": { "crf": 8, "imageFormat": "png", "x264Preset": "slow", "pixelFormat": "yuv444p" },
+  "spec": {
+    "version": 1,
+    "meta": { "width": 1920, "height": 1080, "fps": 30, "durationInFrames": 360, "background": "#0F1B16", "title": "引擎验证B-信息对比" },
+    "elements": [
+      { "id": "title", "kind": "text", "x": 560, "y": 96, "w": 800, "fontSize": 72, "fontWeight": 700, "color": "#F5F1E8", "align": "center", "text": "两种答案方式", "z": 5 },
+
+      { "id": "chipL", "kind": "box", "x": 300, "y": 262, "w": 300, "h": 72, "bg": "rgba(94,168,255,0.12)", "borderColor": "#5EA8FF", "borderWidth": 2, "radius": 999, "z": 2 },
+      { "id": "chipLt", "kind": "text", "x": 300, "y": 278, "w": 300, "fontSize": 34, "fontWeight": 600, "color": "#5EA8FF", "align": "center", "text": "Google 搜索", "z": 3 },
+      { "id": "chipR", "kind": "box", "x": 1320, "y": 262, "w": 300, "h": 72, "bg": "rgba(74,222,128,0.10)", "borderColor": "#4ADE80", "borderWidth": 2, "radius": 999, "z": 2 },
+      { "id": "chipRt", "kind": "text", "x": 1320, "y": 278, "w": 300, "fontSize": 34, "fontWeight": 600, "color": "#4ADE80", "align": "center", "text": "ChatGPT 对话", "z": 3 },
+
+      { "id": "ls1", "kind": "box", "x": 270, "y": 400, "w": 360, "h": 76, "bg": "rgba(255,255,255,0.05)", "borderColor": "rgba(255,255,255,0.14)", "borderWidth": 1.5, "radius": 14, "z": 2 },
+      { "id": "ls1t", "kind": "text", "x": 270, "y": 418, "w": 360, "fontSize": 36, "fontWeight": 500, "color": "#F5F1E8", "align": "center", "text": "提问", "z": 3 },
+      { "id": "la1", "kind": "arrow", "x": 450, "y": 482, "x2": 450, "y2": 518, "stroke": "#5EA8FF", "strokeWidth": 3, "z": 2 },
+      { "id": "ls2", "kind": "box", "x": 270, "y": 524, "w": 360, "h": 76, "bg": "rgba(255,255,255,0.05)", "borderColor": "rgba(255,255,255,0.14)", "borderWidth": 1.5, "radius": 14, "z": 2 },
+      { "id": "ls2t", "kind": "text", "x": 270, "y": 542, "w": 360, "fontSize": 36, "fontWeight": 500, "color": "#F5F1E8", "align": "center", "text": "答案", "z": 3 },
+      { "id": "la2", "kind": "arrow", "x": 450, "y": 606, "x2": 450, "y2": 642, "stroke": "#5EA8FF", "strokeWidth": 3, "z": 2 },
+      { "id": "ls3", "kind": "box", "x": 270, "y": 648, "w": 360, "h": 76, "bg": "rgba(255,255,255,0.05)", "borderColor": "rgba(255,255,255,0.14)", "borderWidth": 1.5, "radius": 14, "z": 2 },
+      { "id": "ls3t", "kind": "text", "x": 270, "y": 666, "w": 360, "fontSize": 36, "fontWeight": 600, "color": "#E8A33D", "align": "center", "text": "结束", "z": 3 },
+
+      { "id": "rs1", "kind": "box", "x": 1290, "y": 388, "w": 360, "h": 72, "bg": "rgba(255,255,255,0.05)", "borderColor": "rgba(255,255,255,0.14)", "borderWidth": 1.5, "radius": 14, "z": 2 },
+      { "id": "rs1t", "kind": "text", "x": 1290, "y": 405, "w": 360, "fontSize": 34, "fontWeight": 500, "color": "#F5F1E8", "align": "center", "text": "提问", "z": 3 },
+      { "id": "ra1", "kind": "arrow", "x": 1470, "y": 464, "x2": 1470, "y2": 494, "stroke": "#4ADE80", "strokeWidth": 3, "z": 2 },
+      { "id": "rs2", "kind": "box", "x": 1290, "y": 498, "w": 360, "h": 72, "bg": "rgba(255,255,255,0.05)", "borderColor": "rgba(255,255,255,0.14)", "borderWidth": 1.5, "radius": 14, "z": 2 },
+      { "id": "rs2t", "kind": "text", "x": 1290, "y": 515, "w": 360, "fontSize": 34, "fontWeight": 500, "color": "#F5F1E8", "align": "center", "text": "回答", "z": 3 },
+      { "id": "ra2", "kind": "arrow", "x": 1470, "y": 574, "x2": 1470, "y2": 604, "stroke": "#4ADE80", "strokeWidth": 3, "z": 2 },
+      { "id": "rs3", "kind": "box", "x": 1290, "y": 608, "w": 360, "h": 72, "bg": "rgba(232,163,61,0.10)", "borderColor": "#E8A33D", "borderWidth": 1.5, "radius": 14, "z": 2 },
+      { "id": "rs3t", "kind": "text", "x": 1290, "y": 625, "w": 360, "fontSize": 34, "fontWeight": 600, "color": "#E8A33D", "align": "center", "text": "新问题", "z": 3 },
+      { "id": "ra3", "kind": "arrow", "x": 1470, "y": 684, "x2": 1470, "y2": 714, "stroke": "#4ADE80", "strokeWidth": 3, "z": 2 },
+      { "id": "rs4", "kind": "box", "x": 1290, "y": 718, "w": 360, "h": 72, "bg": "rgba(255,255,255,0.05)", "borderColor": "rgba(255,255,255,0.14)", "borderWidth": 1.5, "radius": 14, "z": 2 },
+      { "id": "rs4t", "kind": "text", "x": 1290, "y": 735, "w": 360, "fontSize": 34, "fontWeight": 500, "color": "#F5F1E8", "align": "center", "text": "继续问", "z": 3 },
+
+      { "id": "vs", "kind": "text", "x": 870, "y": 510, "w": 180, "fontSize": 72, "fontWeight": 800, "color": "#E8A33D", "align": "center", "text": "vs", "z": 5 },
+
+      { "id": "cc1", "kind": "text", "x": 510, "y": 890, "w": 460, "fontSize": 54, "fontWeight": 600, "color": "#F5F1E8", "align": "right", "text": "搜完就停，", "z": 4 },
+      { "id": "cc2", "kind": "text", "x": 990, "y": 890, "w": 420, "fontSize": 54, "fontWeight": 700, "color": "#0F1B16", "align": "left", "text": "越聊越深", "z": 4 }
+    ],
+    "beats": [
+      { "id": "b1", "label": "建立主题" },
+      { "id": "b2", "label": "展开搜索路径" },
+      { "id": "b3", "label": "展开对话路径" },
+      { "id": "b4", "label": "强调核心差异" }
+    ],
+    "actions": [
+      { "action": "typeIn", "target": "title", "beat": "b1", "offset": 0, "speed": "normal" },
+      { "action": "popIn", "target": "chipL", "beat": "b1", "offset": 28 },
+      { "action": "popIn", "target": "chipLt", "beat": "b1", "offset": 28 },
+      { "action": "popIn", "target": "chipR", "beat": "b1", "offset": 34 },
+      { "action": "popIn", "target": "chipRt", "beat": "b1", "offset": 34 },
+
+      { "action": "stagger", "target": "ls1", "targets": ["ls1", "ls1t", "ls2", "ls2t", "ls3", "ls3t"], "beat": "b2", "offset": 0, "staggerGap": 12, "duration": 18 },
+      { "action": "connectArrow", "target": "la1", "beat": "b2", "offset": 26, "duration": 12 },
+      { "action": "connectArrow", "target": "la2", "beat": "b2", "offset": 38, "duration": 12 },
+
+      { "action": "stagger", "target": "rs1", "targets": ["rs1", "rs1t", "rs2", "rs2t", "rs3", "rs3t", "rs4", "rs4t"], "beat": "b3", "offset": 0, "staggerGap": 10, "duration": 16 },
+      { "action": "connectArrow", "target": "ra1", "beat": "b3", "offset": 22, "duration": 10 },
+      { "action": "connectArrow", "target": "ra2", "beat": "b3", "offset": 32, "duration": 10 },
+      { "action": "connectArrow", "target": "ra3", "beat": "b3", "offset": 42, "duration": 10 },
+
+      { "action": "popIn", "target": "vs", "beat": "b4", "offset": 0, "intensity": "strong" },
+      { "action": "circleMark", "target": "ls3", "beat": "b4", "offset": 4, "color": "#E8A33D" },
+      { "action": "slideIn", "target": "cc1", "beat": "b4", "offset": 12, "direction": "left" },
+      { "action": "slideIn", "target": "cc2", "beat": "b4", "offset": 18, "direction": "left" },
+      { "action": "highlight", "target": "cc2", "beat": "b4", "offset": 26, "color": "#E8A33D" },
+      { "action": "cameraPush", "target": "camera", "beat": "b4", "offset": 34, "region": { "x": 430, "y": 840, "w": 1060, "h": 180 }, "speed": "normal" },
+      { "action": "cameraPull", "target": "camera", "beat": "b4", "offset": 78, "speed": "normal" },
+      { "action": "fadeOut", "target": "vs", "beat": "b4", "offset": 80, "duration": 15 }
+    ]
+  }
+}

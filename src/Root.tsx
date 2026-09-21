@@ -5,10 +5,28 @@ import chainB from '../jobs/chain-b-compare.json';
 import {ImageFocus, imageFocusDuration} from './templates/ImageFocus';
 import {InfoCompare, infoCompareDuration} from './templates/InfoCompare';
 import type {ImageFocusProps, InfoCompareProps} from './types';
+import {SpecComposition} from './engine/SpecComposition';
+import type {AnimSpec} from './spec/types';
+import demoSpec from '../jobs/spec-demo.json';
 
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      <Composition
+        id="Spec"
+        component={SpecComposition}
+        width={1920}
+        height={1080}
+        fps={30}
+        durationInFrames={300}
+        defaultProps={{spec: demoSpec as unknown as AnimSpec}}
+        calculateMetadata={({props}) => ({
+          durationInFrames: props.spec.meta.durationInFrames,
+          width: props.spec.meta.width,
+          height: props.spec.meta.height,
+          fps: props.spec.meta.fps,
+        })}
+      />
       <Composition
         id="ImageFocus"
         component={ImageFocus}

@@ -113,7 +113,7 @@ await renderMedia({
   serveUrl,
   codec: 'h264',
   outputLocation: mp4Path,
-  inputProps: job.inputProps,
+  inputProps: job.composition === 'Spec' ? {spec: job.spec} : job.inputProps,
   concurrency,
   imageFormat,
   jpegQuality,
@@ -141,7 +141,7 @@ for (const f of stills) {
   await renderStill({
     composition,
     serveUrl,
-    inputProps: job.inputProps,
+    inputProps: job.composition === 'Spec' ? {spec: job.spec} : job.inputProps,
     frame: f,
     output: p,
     imageFormat: 'png',

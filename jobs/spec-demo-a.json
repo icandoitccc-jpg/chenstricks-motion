@@ -1,0 +1,37 @@
+{
+  "composition": "Spec",
+  "description": "统一引擎验证A：功能A式图片局部动画（imageRegion popIn/pulse + 手绘下划线 + 手绘圈 + 镜头推近/拉远 + focus压暗）",
+  "concurrency": 2,
+  "stills": [25, 70, 130, 190, 260],
+  "encode": { "crf": 8, "imageFormat": "png", "x264Preset": "slow", "pixelFormat": "yuv444p" },
+  "spec": {
+    "version": 1,
+    "meta": { "width": 1920, "height": 1080, "fps": 30, "durationInFrames": 300, "title": "引擎验证A-图片局部" },
+    "elements": [
+      { "id": "base", "kind": "image", "x": 0, "y": 0, "w": 1920, "h": 1080, "src": "assets/sample-design.png", "fit": "cover", "z": 0 },
+      { "id": "r-title", "kind": "imageRegion", "x": 90, "y": 196, "w": 580, "h": 180, "src": "assets/sample-design.png", "imageW": 1920, "imageH": 1080, "region": { "x": 90, "y": 196, "w": 580, "h": 180 }, "z": 2 },
+      { "id": "r-keyword", "kind": "imageRegion", "x": 100, "y": 480, "w": 440, "h": 210, "src": "assets/sample-design.png", "imageW": 1920, "imageH": 1080, "region": { "x": 100, "y": 480, "w": 440, "h": 210 }, "z": 2 },
+      { "id": "r-card", "kind": "imageRegion", "x": 1060, "y": 272, "w": 760, "h": 560, "src": "assets/sample-design.png", "imageW": 1920, "imageH": 1080, "region": { "x": 1060, "y": 272, "w": 760, "h": 560 }, "z": 1 },
+      { "id": "r-button", "kind": "imageRegion", "x": 1060, "y": 842, "w": 330, "h": 140, "src": "assets/sample-design.png", "imageW": 1920, "imageH": 1080, "region": { "x": 1060, "y": 842, "w": 330, "h": 140 }, "z": 2 }
+    ],
+    "beats": [
+      { "id": "b1", "label": "标题弹出" },
+      { "id": "b2", "label": "关键词强调+划线" },
+      { "id": "b3", "label": "圈出卡片+镜头推近" },
+      { "id": "b4", "label": "按钮弹一下+镜头拉回" }
+    ],
+    "actions": [
+      { "action": "popIn", "target": "r-title", "beat": "b1", "offset": 6, "intensity": "normal" },
+
+      { "action": "pulse", "target": "r-keyword", "beat": "b2", "offset": 0, "intensity": "normal" },
+      { "action": "underlineDraw", "target": "r-keyword", "beat": "b2", "offset": 14, "color": "#5EA8FF" },
+
+      { "action": "circleMark", "target": "r-card", "beat": "b3", "offset": 0, "color": "#5EA8FF" },
+      { "action": "cameraPush", "target": "camera", "beat": "b3", "offset": 8, "region": { "x": 1060, "y": 272, "w": 760, "h": 560 }, "speed": "slow" },
+      { "action": "focus", "target": "camera", "beat": "b3", "offset": 8, "region": { "x": 1060, "y": 272, "w": 760, "h": 560 }, "dim": 0.45, "speed": "slow" },
+
+      { "action": "cameraPull", "target": "camera", "beat": "b4", "offset": 0, "speed": "normal" },
+      { "action": "pulse", "target": "r-button", "beat": "b4", "offset": 22, "intensity": "strong" }
+    ]
+  }
+}

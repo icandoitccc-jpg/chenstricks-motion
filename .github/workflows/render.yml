@@ -1,8 +1,16 @@
-name: Render PoC
+name: Render
 
 on:
   workflow_dispatch:
     inputs:
+      job:
+        description: 'jobs/ 下的任务名（如 spec-demo）；与 specJson 二选一'
+        required: false
+        default: ''
+      specJson:
+        description: '完整 AnimSpec JSON 字符串（App 云端渲染通道）；提供时优先于 job'
+        required: false
+        default: ''
       note:
         description: '备注（可选）'
         required: false
@@ -24,7 +32,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        job: [chain-b-q4]
+        # push 触发时跑矩阵里的验证任务；workflow_dispatch 带 specJson 时走单任务
+        job: ${{ github.event_name == 'push' && fromJSON('[{"j":"spec-demo"},{"j":"spec-demo-a"}]') || fromJSON('[{"j":"dispatch"}]') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +41,26 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: 决定本次渲染任务
+        id: decide
+        run: |
+          if [ -n "${{ inputs.specJson }}" ]; then
+            echo "jobname=dispatch" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ inputs.job }}" ]; then
+            echo "jobname=${{ inputs.job }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "jobname=${{ matrix.job.j }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 写入动态 spec（App 通道）
+        if: steps.decide.outputs.jobname == 'dispatch'
+        run: |
+          mkdir -p jobs
+          cat > jobs/dispatch.json <<'EOF'
+          ${{ inputs.specJson }}
+          EOF
+          node -e "const j=require('./jobs/dispatch.json'); if(!j.spec) throw new Error('dispatch.json 必须包含 spec 字段'); console.log('spec OK, elements:', j.spec.elements.length, 'actions:', j.spec.actions.length)"
 
       - name: 安装依赖
         run: npm ci --no-audit --no-fund
@@ -43,19 +72,12 @@ jobs:
             || sudo apt-get install -y libnss3 libgbm1 || true
 
       - name: 下载渲染用浏览器
-        run: |
-          T0=$(date +%s)
-          npx remotion browser ensure
-          T1=$(date +%s)
-          echo "browser ensure 耗时: $((T1 - T0))s"
+        run: npx remotion browser ensure
 
-      - name: 渲染 ${{ matrix.job }}
+      - name: 渲染 ${{ steps.decide.outputs.jobname }}
         env:
-          JOB: ${{ matrix.job }}
+          JOB: ${{ steps.decide.outputs.jobname }}
         run: node scripts/render.mjs
-
-      - name: 校验预览包可构建（预览与渲染同源）
-        run: node scripts/preview-build.mjs
 
       - name: 统计本任务消耗
         run: echo "本任务墙钟 ${SECONDS}s，按 GitHub 计费向上取整 ≈ $(( SECONDS / 60 + 1 )) Actions 分钟"
@@ -63,6 +85,6 @@ jobs:
       - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
-          name: out-${{ matrix.job }}
-          path: out/${{ matrix.job }}
-          retention-days: 7
+          name: out-${{ steps.decide.outputs.jobname }}-${{ github.run_id }}
+          path: out/${{ steps.decide.outputs.jobname }}
+          retention-days: 2
