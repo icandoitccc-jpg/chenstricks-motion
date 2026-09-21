@@ -1,0 +1,68 @@
+name: Render PoC
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: '备注（可选）'
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'jobs/**'
+      - 'scripts/**'
+      - 'public/**'
+      - '.github/workflows/**'
+      - 'package.json'
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        job: [chain-a-image, chain-b-compare]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund
+
+      - name: 补齐 headless 浏览器系统库（失败不阻断，运行器通常已自带）
+        run: |
+          sudo apt-get update -qq || true
+          sudo apt-get install -y libnss3 libgbm1 libatk1.0-0 libatk-bridge2.0-0 libxkbcommon0 libasound2 \
+            || sudo apt-get install -y libnss3 libgbm1 || true
+
+      - name: 下载渲染用浏览器
+        run: |
+          T0=$(date +%s)
+          npx remotion browser ensure
+          T1=$(date +%s)
+          echo "browser ensure 耗时: $((T1 - T0))s"
+
+      - name: 渲染 ${{ matrix.job }}
+        env:
+          JOB: ${{ matrix.job }}
+        run: node scripts/render.mjs
+
+      - name: 校验预览包可构建（预览与渲染同源）
+        run: node scripts/preview-build.mjs
+
+      - name: 统计本任务消耗
+        run: echo "本任务墙钟 ${SECONDS}s，按 GitHub 计费向上取整 ≈ $(( SECONDS / 60 + 1 )) Actions 分钟"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: out-${{ matrix.job }}
+          path: out/${{ matrix.job }}
+          retention-days: 7
