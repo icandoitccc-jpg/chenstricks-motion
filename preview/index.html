@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>chenstricks Motion — 预览</title>
+    <style>
+      body { margin: 0; background: #f6f4ef; color: #1c2b28; }
+      .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 60px; }
+      h1 { font-size: 22px; margin: 0 0 6px; }
+      p.sub { font-size: 13px; color: #5f6b68; margin: 0 0 28px; }
+      h2 { font-size: 16px; margin: 34px 0 10px; }
+      .frame { border: 1px solid #ddd8cc; border-radius: 12px; overflow: hidden; background: #0f2e2a; }
+      .note { font-size: 12px; color: #5f6b68; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>chenstricks Motion — 预览</h1>
+      <p class="sub">与云端渲染使用完全相同的组件、同一份 jobs/*.json、同一个字体文件（Noto Sans SC）。</p>
+      <h2>链路 A：图片局部动画（jobs/chain-a-image.json）</h2>
+      <div class="frame" id="player-a"></div>
+      <p class="note">标题弹出 → 关键词强调 → 手绘线画出 → 卡片上滑 → 按钮弹跳 + 悬浮</p>
+      <h2>链路 B：信息动画 · 对比（jobs/chain-b-compare.json）</h2>
+      <div class="frame" id="player-b"></div>
+      <p class="note">左「搜索 → 答案 → 结束」 vs 右「对话 → 回答 → 新问题 → 继续问」，强调「搜」「聊」</p>
+    </div>
+    <script src="./bundle.js"></script>
+  </body>
+</html>

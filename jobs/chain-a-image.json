@@ -1,0 +1,59 @@
+{
+  "composition": "ImageFocus",
+  "description": "链路A：一张完成构图的设计图，5 个局部区域按顺序独立动画（标题弹出 → 关键词强调 → 手绘线画出 → 卡片上滑 → 按钮弹跳+悬浮）",
+  "concurrency": 2,
+  "stills": [30, 70, 110, 165, 220],
+  "inputProps": {
+    "image": "assets/sample-design.png",
+    "width": 1920,
+    "height": 1080,
+    "regions": [
+      {
+        "id": "title",
+        "effect": "appear",
+        "cover": "#0F2E2A",
+        "box": { "x": 90, "y": 196, "w": 580, "h": 180 },
+        "startFrame": 12,
+        "durationFrames": 22
+      },
+      {
+        "id": "keyword",
+        "effect": "pop",
+        "box": { "x": 100, "y": 480, "w": 440, "h": 210 },
+        "startFrame": 50,
+        "durationFrames": 22,
+        "scale": 0.16
+      },
+      {
+        "id": "arrow",
+        "effect": "drawLine",
+        "line": { "x1": 560, "y1": 568, "x2": 1040, "y2": 540, "color": "#E8A33D", "width": 8 },
+        "startFrame": 78,
+        "durationFrames": 24
+      },
+      {
+        "id": "card",
+        "effect": "slideUp",
+        "cover": "#0F2E2A",
+        "box": { "x": 1060, "y": 272, "w": 760, "h": 560 },
+        "startFrame": 100,
+        "durationFrames": 26
+      },
+      {
+        "id": "button",
+        "effect": "pop",
+        "box": { "x": 1060, "y": 842, "w": 330, "h": 140 },
+        "startFrame": 160,
+        "durationFrames": 18,
+        "scale": 0.12
+      },
+      {
+        "id": "button-float",
+        "effect": "float",
+        "box": { "x": 1060, "y": 842, "w": 330, "h": 140 },
+        "startFrame": 190,
+        "durationFrames": 60
+      }
+    ]
+  }
+}

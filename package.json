@@ -1,0 +1,27 @@
+{
+  "name": "chenstricks-motion",
+  "version": "0.1.0",
+  "private": true,
+  "description": "chenstricks Motion — 让已完成的图片局部动起来 / 把一段信息变成信息动画，输出可直接导入剪映的短视频 MP4",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "bundle": "remotion bundle src/index.ts out/bundle",
+    "render": "node scripts/render.mjs",
+    "preview": "node scripts/preview.mjs",
+    "preview:build": "node scripts/preview-build.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.526",
+    "@remotion/cli": "^4.0.526",
+    "@remotion/fonts": "^4.0.526",
+    "@remotion/player": "^4.0.526",
+    "@remotion/renderer": "^4.0.526",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "remotion": "^4.0.526",
+    "typescript": "^7.0.2"
+  }
+}
