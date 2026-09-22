@@ -29,7 +29,9 @@ async function gh<T = unknown>(method: string, path: string, body?: unknown): Pr
     const t = await r.text();
     throw new Error(`GitHub API ${r.status}: ${t.slice(0, 200)}`);
   }
-  return r.json() as Promise<T>;
+  // 204 No Content（如 workflow_dispatch 成功）等空响应直接返回 undefined
+  const text = await r.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export async function verifyPat(): Promise<string> {

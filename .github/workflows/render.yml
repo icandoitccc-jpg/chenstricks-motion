@@ -44,22 +44,25 @@ jobs:
 
       - name: 决定本次渲染任务
         id: decide
+        env:
+          SPEC_JSON: ${{ inputs.specJson }}
+          JOB_INPUT: ${{ inputs.job }}
         run: |
-          if [ -n "${{ inputs.specJson }}" ]; then
+          if [ -n "$SPEC_JSON" ]; then
             echo "jobname=dispatch" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ inputs.job }}" ]; then
-            echo "jobname=${{ inputs.job }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "$JOB_INPUT" ]; then
+            echo "jobname=$JOB_INPUT" >> "$GITHUB_OUTPUT"
           else
             echo "jobname=${{ matrix.job.j }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: 写入动态 spec（App 通道）
         if: steps.decide.outputs.jobname == 'dispatch'
+        env:
+          SPEC_JSON: ${{ inputs.specJson }}
         run: |
           mkdir -p jobs
-          cat > jobs/dispatch.json <<'EOF'
-          ${{ inputs.specJson }}
-          EOF
+          printf '%s' "$SPEC_JSON" > jobs/dispatch.json
           node -e "const j=require('./jobs/dispatch.json'); if(!j.spec) throw new Error('dispatch.json 必须包含 spec 字段'); console.log('spec OK, elements:', j.spec.elements.length, 'actions:', j.spec.actions.length)"
 
       - name: 安装依赖
