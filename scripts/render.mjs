@@ -98,7 +98,7 @@ say(`- bundle: ${(bundleMs / 1000).toFixed(1)}s`);
 const composition = await selectComposition({
   serveUrl,
   id: job.composition,
-  inputProps: job.inputProps,
+  inputProps: job.composition === 'Spec' ? {spec: job.spec} : job.inputProps,
 });
 const selectMs = Date.now() - bundleStart - bundleMs;
 say(
