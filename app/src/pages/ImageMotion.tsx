@@ -146,10 +146,11 @@ export const ImageMotion: React.FC = () => {
     );
   }
 
-  // 画布显示：完整适配进 920×640 的编辑区域（横竖图都不裁切、不过高）
-  const dispScale = Math.min(920 / image.w, 640 / image.h);
+  // 画布显示：宽度适配工作区（≤920px），保持原始宽高比；长图不强行缩进一屏，由外层容器纵向滚动查看
+  const dispScale = Math.min(920 / image.w, 1); // 小图不放大，避免模糊
   const dispW = Math.round(image.w * dispScale);
   const dispH = Math.round(image.h * dispScale);
+  const isTall = dispH > 720;
 
   // 生成高清 MP4：先选输出比例，再发起云端渲染
   const startExport = () => {
@@ -195,37 +196,50 @@ export const ImageMotion: React.FC = () => {
       <div className="a-layout">
         {/* 画布 */}
         <div>
-          <div
-            ref={canvasRef}
-            className="canvas-wrap"
-            style={{ width: dispW, cursor: 'crosshair' }}
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}
-            onMouseLeave={onMouseUp}
-          >
-            <img src={image.dataUrl} alt="" />
-            {items.map((it, idx) => (
-              <div
-                key={it.id}
-                className={`region-box ${selected === it.id ? 'selected' : ''}`}
-                style={{
-                  left: it.region.x * dispScale, top: it.region.y * dispScale,
-                  width: it.region.w * dispScale, height: it.region.h * dispScale,
-                }}
-                onClick={(e) => { e.stopPropagation(); setSelected(it.id); }}
-              >
-                <span className="idx">{idx + 1}</span>
-              </div>
-            ))}
-            {drawing && (
-              <div className="draw-box" style={{
-                left: Math.min(drawing.x0, drawing.x1) * dispScale,
-                top: Math.min(drawing.y0, drawing.y1) * dispScale,
-                width: Math.abs(drawing.x1 - drawing.x0) * dispScale,
-                height: Math.abs(drawing.y1 - drawing.y0) * dispScale,
-              }} />
-            )}
+          {/* 下一步引导：未框选时明显提示；已框选后弱化为状态提示 */}
+          {items.length === 0 ? (
+            <div className="card" style={{ marginBottom: 12, borderColor: 'var(--accent)', background: 'rgba(232,163,61,0.08)' }}>
+              <b style={{ fontSize: 15 }}>下一步：在图片上拖动，框选你想让它动起来的区域</b>
+              <div className="muted" style={{ marginTop: 4 }}>例如：标题、按钮、文字、卡片或其他想强调的部分{isTall ? '。图片较长，可以上下滚动查看整张图' : ''}</div>
+            </div>
+          ) : (
+            <div className="card" style={{ marginBottom: 12, padding: '10px 16px' }}>
+              <span className="muted">{sel && !sel.effect ? '已框选区域 → 在右侧为它选择一个动画效果' : '继续在图片上框选其他区域，或点击右侧「预览」查看效果'}</span>
+            </div>
+          )}
+          <div style={{ maxHeight: isTall ? '72vh' : undefined, overflowY: isTall ? 'auto' : undefined, borderRadius: 12 }}>
+            <div
+              ref={canvasRef}
+              className="canvas-wrap"
+              style={{ width: dispW, cursor: 'crosshair' }}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={onMouseUp}
+            >
+              <img src={image.dataUrl} alt="" />
+              {items.map((it, idx) => (
+                <div
+                  key={it.id}
+                  className={`region-box ${selected === it.id ? 'selected' : ''}`}
+                  style={{
+                    left: it.region.x * dispScale, top: it.region.y * dispScale,
+                    width: it.region.w * dispScale, height: it.region.h * dispScale,
+                  }}
+                  onClick={(e) => { e.stopPropagation(); setSelected(it.id); }}
+                >
+                  <span className="idx">{idx + 1}</span>
+                </div>
+              ))}
+              {drawing && (
+                <div className="draw-box" style={{
+                  left: Math.min(drawing.x0, drawing.x1) * dispScale,
+                  top: Math.min(drawing.y0, drawing.y1) * dispScale,
+                  width: Math.abs(drawing.x1 - drawing.x0) * dispScale,
+                  height: Math.abs(drawing.y1 - drawing.y0) * dispScale,
+                }} />
+              )}
+            </div>
           </div>
           <p className="muted" style={{ marginTop: 8 }}>在图片上拖动框选想让它动的区域；点击已有区域可调整效果。</p>
         </div>
