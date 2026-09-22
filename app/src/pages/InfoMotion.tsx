@@ -66,6 +66,9 @@ export const InfoMotion: React.FC = () => {
   if (phase === 'input' || phase === 'analyzing') {
     return (
       <div style={{ maxWidth: 720 }}>
+        <div className="row" style={{ marginBottom: 6 }}>
+          <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
+        </div>
         <h2 className="page-title">信息动画</h2>
         <p className="page-sub">粘贴一段话，AI 先告诉你「它打算怎么表达」，你确认后再生成动画。</p>
         <div className="card col" style={{ gap: 12 }}>
@@ -100,7 +103,10 @@ export const InfoMotion: React.FC = () => {
   return (
     <div>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
-        <b>信息动画 · 动画方案</b>
+        <div className="row">
+          <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
+          <b>信息动画 · 动画方案</b>
+        </div>
         <div className="row">
           <button className="ghost" onClick={() => { setPhase('input'); setPlan(null); }}>← 重新输入</button>
           <button className="ghost" onClick={() => setPhase('input')}>重新分析</button>

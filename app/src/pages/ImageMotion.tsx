@@ -18,12 +18,21 @@ export const ImageMotion: React.FC = () => {
   const [category, setCategory] = useState<AEffectCategory>('强调');
   const [drawing, setDrawing] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [exportAspect, setExportAspect] = useState<AspectKey>('16:9');
   const canvasRef = useRef<HTMLDivElement>(null);
   const cloud = useCloudRender();
 
   const sel = items.find((i) => i.id === selected) ?? null;
 
+  const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+  const LOW_RES = 1280;
+
   const onUpload = (f: File) => {
+    if (f.size > MAX_SIZE) {
+      alert('图片超过 10MB，请换一张小一点的图片。');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
@@ -36,6 +45,8 @@ export const ImageMotion: React.FC = () => {
     };
     reader.readAsDataURL(f);
   };
+
+  const lowRes = image ? Math.max(image.w, image.h) < LOW_RES : false;
 
   // 画布坐标（显示）→ 原图坐标
   const toImageCoords = (clientX: number, clientY: number) => {
@@ -116,44 +127,53 @@ export const ImageMotion: React.FC = () => {
   if (!image) {
     return (
       <div>
+        <div className="row" style={{ marginBottom: 6 }}>
+          <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
+        </div>
         <h2 className="page-title">让图片动起来</h2>
         <p className="page-sub">上传一张已经完成构图的图片，框选局部区域，让它们按顺序动起来。</p>
         <div className="card" style={{ maxWidth: 560, textAlign: 'center', padding: 40 }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🖼️</div>
-          <p className="muted">支持 JPG / PNG，建议 ≥1280px，单张 ≤10MB</p>
+          <p className="muted">支持 JPG / PNG，横图、竖图、方图、截图都可以，单张 ≤10MB</p>
+          <p className="muted" style={{ fontSize: 12, opacity: 0.7 }}>图片越清晰，导出的视频越清晰</p>
           <label>
             <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }}
               onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
             <span className="tag amber" style={{ cursor: 'pointer', padding: '10px 24px', fontSize: 15 }}>选择图片</span>
           </label>
-          <div className="row" style={{ justifyContent: 'center', marginTop: 24 }}>
-            <span className="muted">画布比例：</span>
-            {(Object.keys(ASPECTS) as AspectKey[]).map((k) => (
-              <button key={k} className={aspect === k ? 'primary' : ''} onClick={() => setAspect(k)}>{k}</button>
-            ))}
-          </div>
         </div>
       </div>
     );
   }
 
-  const dispW = 920;
-  const dispScale = dispW / image.w;
+  // 画布显示：完整适配进 920×640 的编辑区域（横竖图都不裁切、不过高）
+  const dispScale = Math.min(920 / image.w, 640 / image.h);
+  const dispW = Math.round(image.w * dispScale);
+  const dispH = Math.round(image.h * dispScale);
+
+  // 生成高清 MP4：先选输出比例，再发起云端渲染
+  const startExport = () => {
+    const ready = items.filter((i) => i.effect);
+    if (!image || !ready.length) return;
+    setAspect(exportAspect); // 后续预览与导出比例一致
+    const s = buildSpecA({ imageSrc: image.dataUrl, imageW: image.w, imageH: image.h, aspect: exportAspect, items: ready });
+    setShowExport(false);
+    cloud.run({ spec: s, imageDataUrl: image.dataUrl, fileName: `motion-a-${Date.now()}.mp4` });
+  };
 
   return (
     <div>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
         <div className="row">
+          <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
           <b>让图片动起来</b>
-          {(Object.keys(ASPECTS) as AspectKey[]).map((k) => (
-            <button key={k} className={aspect === k ? 'primary' : 'ghost'} style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => setAspect(k)}>{k}</button>
-          ))}
           <button className="ghost" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => { setImage(null); setItems([]); }}>换图片</button>
+          {lowRes && <span className="tag" style={{ fontSize: 12 }}>源图分辨率较低，最终导出可能不够清晰</span>}
         </div>
         <div className="row">
           <button className="blue" disabled={!spec} onClick={() => setShowPreview(true)}>预览</button>
           <button className="primary" disabled={!spec || cloud.phase === 'waiting' || cloud.phase === 'dispatching' || cloud.phase === 'uploading'}
-            onClick={() => spec && cloud.run({ spec, imageDataUrl: image.dataUrl, fileName: `motion-a-${Date.now()}.mp4` })}>
+            onClick={() => { setExportAspect(aspect); setShowExport(true); }}>
             生成高清 MP4
           </button>
         </div>
@@ -302,6 +322,29 @@ export const ImageMotion: React.FC = () => {
             <PreviewPlayer spec={spec} />
             <div className="row" style={{ justifyContent: 'flex-end', marginTop: 10 }}>
               <button onClick={() => setShowPreview(false)}>关闭预览</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 生成弹层：选择输出比例 */}
+      {showExport && (
+        <div className="modal-mask" onClick={() => setShowExport(false)}>
+          <div className="card col" style={{ width: 420, maxWidth: '92vw', gap: 14 }} onClick={(e) => e.stopPropagation()}>
+            <b>生成高清 MP4</b>
+            <span className="muted">选择最终视频的画布比例（原图会完整显示，不裁切；不足部分留背景色）：</span>
+            <div className="col" style={{ gap: 8 }}>
+              {(Object.keys(ASPECTS) as AspectKey[]).map((k) => (
+                <button key={k} className={exportAspect === k ? 'primary' : 'ghost'} style={{ textAlign: 'left', padding: '10px 14px' }}
+                  onClick={() => setExportAspect(k)}>
+                  {k}{ { '16:9': ' 横屏', '9:16': ' 竖屏', '3:4': ' 竖版' }[k] }
+                  <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{ASPECTS[k].w}×{ASPECTS[k].h}</span>
+                </button>
+              ))}
+            </div>
+            <div className="row" style={{ justifyContent: 'flex-end' }}>
+              <button className="ghost" onClick={() => setShowExport(false)}>取消</button>
+              <button className="primary" onClick={startExport}>开始生成</button>
             </div>
           </div>
         </div>

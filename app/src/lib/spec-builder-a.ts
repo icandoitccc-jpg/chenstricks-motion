@@ -1,5 +1,5 @@
 // 功能A spec 构建：画布框选区域 + 效果配置 + 顺序/节奏 → AnimSpec
-// 坐标约定：区域以原图像素记录；画布尺寸按画幅选择；底图 cover 居中 → 区域副本按同一 scale/offset 映射。
+// 坐标约定：区域以原图像素记录；画布尺寸按输出比例；底图 contain 居中（完整显示不裁切，不足区域留背景）→ 区域副本按同一 scale/offset 映射。
 import type { ActionName, AnimSpec, Region, SpecAction, SpecElement } from '../../../src/spec/types';
 
 export type AspectKey = '16:9' | '9:16' | '3:4';
@@ -47,10 +47,11 @@ export interface AItem {
   isCamera: boolean;
 }
 
-export interface CoverMap { scale: number; offsetX: number; offsetY: number }
+export interface FitMap { scale: number; offsetX: number; offsetY: number }
 
-export function coverMap(iw: number, ih: number, cw: number, ch: number): CoverMap {
-  const scale = Math.max(cw / iw, ch / ih);
+// contain：完整显示原图，不裁切；不足区域留在画布背景中
+export function fitMap(iw: number, ih: number, cw: number, ch: number): FitMap {
+  const scale = Math.min(cw / iw, ch / ih);
   return { scale, offsetX: (cw - iw * scale) / 2, offsetY: (ch - ih * scale) / 2 };
 }
 
@@ -68,10 +69,10 @@ export function buildSpecA(opts: {
   const { imageSrc, imageW, imageH, aspect, items } = opts;
   const fps = opts.fps ?? 30;
   const { w: cw, h: ch } = ASPECTS[aspect];
-  const map = coverMap(imageW, imageH, cw, ch);
+  const map = fitMap(imageW, imageH, cw, ch);
 
   const elements: SpecElement[] = [
-    { id: 'base', kind: 'image', x: 0, y: 0, w: cw, h: ch, src: imageSrc, imageW, imageH, fit: 'cover', z: 0 },
+    { id: 'base', kind: 'image', x: 0, y: 0, w: cw, h: ch, src: imageSrc, imageW, imageH, fit: 'contain', z: 0 },
   ];
   const actions: SpecAction[] = [];
 
