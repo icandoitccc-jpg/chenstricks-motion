@@ -1,6 +1,6 @@
 // 功能A：让图片动起来
 // 上传 → 框选 → 选效果（分类→具体）→ 实时预览 → 排序/节奏 → 云端生成 MP4
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Region } from '../../../src/spec/types';
 import { A_EFFECTS, AEffectCategory, AItem, AspectKey, ASPECTS, buildSpecA } from '../lib/spec-builder-a';
 import { PreviewPlayer } from '../components/PreviewPlayer';
@@ -9,6 +9,14 @@ import { useCloudRender } from '../lib/useCloudRender';
 interface ImageState { dataUrl: string; w: number; h: number }
 
 let itemSeq = 0;
+
+// 云端渲染的四个阶段，用于在生成弹窗里显示明确进度
+const EXPORT_STEPS = [
+  { key: 'uploading', label: '上传图片素材到云端' },
+  { key: 'dispatching', label: '提交渲染任务' },
+  { key: 'waiting', label: '云端渲染中' },
+  { key: 'downloading', label: '下载 MP4' },
+] as const;
 
 export const ImageMotion: React.FC = () => {
   const [image, setImage] = useState<ImageState | null>(null);
@@ -19,9 +27,24 @@ export const ImageMotion: React.FC = () => {
   const [drawing, setDrawing] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [exportStarted, setExportStarted] = useState(false);
   const [exportAspect, setExportAspect] = useState<AspectKey>('16:9');
   const canvasRef = useRef<HTMLDivElement>(null);
   const cloud = useCloudRender();
+
+  // 弹窗打开时锁定页面滚动，关闭后回到原来的滚动位置
+  const modalOpen = showPreview || showExport;
+  useEffect(() => {
+    if (!modalOpen) return;
+    const y = window.scrollY;
+    document.documentElement.classList.add('cm-scroll-locked');
+    document.body.classList.add('cm-scroll-locked');
+    return () => {
+      document.documentElement.classList.remove('cm-scroll-locked');
+      document.body.classList.remove('cm-scroll-locked');
+      window.scrollTo(0, y);
+    };
+  }, [modalOpen]);
 
   const sel = items.find((i) => i.id === selected) ?? null;
 
@@ -146,21 +169,26 @@ export const ImageMotion: React.FC = () => {
     );
   }
 
-  // 画布显示：宽度适配工作区（≤920px），保持原始宽高比；长图不强行缩进一屏，由外层容器纵向滚动查看
-  const dispScale = Math.min(920 / image.w, 1); // 小图不放大，避免模糊
-  const dispW = Math.round(image.w * dispScale);
-  const dispH = Math.round(image.h * dispScale);
-  const isTall = dispH > 720;
+  // 画布显示：宽度撑满左栏可用空间（不超过原图宽度，避免把小图放大模糊），
+  // 高度由 aspect-ratio 跟随；长图不强行缩进一屏，交给外层容器纵向滚动查看。
+  const isTall = image.h > image.w * 1.6;
+  // 区域框用百分比定位：画布随窗口缩放时框选位置仍然准确
+  const px = (v: number) => `${(v / image.w) * 100}%`;
+  const py = (v: number) => `${(v / image.h) * 100}%`;
 
-  // 生成高清 MP4：先选输出比例，再发起云端渲染
+  // 生成高清 MP4：先选输出比例，再发起云端渲染。
+  // 弹窗不再点击即关——进度、成功、失败全部留在弹窗里，保证当前视口一定看得到反馈。
   const startExport = () => {
     const ready = items.filter((i) => i.effect);
     if (!image || !ready.length) return;
     setAspect(exportAspect); // 后续预览与导出比例一致
     const s = buildSpecA({ imageSrc: image.dataUrl, imageW: image.w, imageH: image.h, aspect: exportAspect, items: ready });
-    setShowExport(false);
+    setExportStarted(true);
     cloud.run({ spec: s, imageDataUrl: image.dataUrl, fileName: `motion-a-${Date.now()}.mp4` });
   };
+
+  const exportRunning = exportStarted && cloud.phase !== 'done' && cloud.phase !== 'error';
+  const closeExport = () => { setShowExport(false); setExportStarted(false); };
 
   return (
     <div>
@@ -173,8 +201,8 @@ export const ImageMotion: React.FC = () => {
         </div>
         <div className="row">
           <button className="blue" disabled={!spec} onClick={() => setShowPreview(true)}>预览</button>
-          <button className="primary" disabled={!spec || cloud.phase === 'waiting' || cloud.phase === 'dispatching' || cloud.phase === 'uploading'}
-            onClick={() => { setExportAspect(aspect); setShowExport(true); }}>
+          <button className="primary" disabled={!spec || exportRunning || cloud.phase === 'waiting' || cloud.phase === 'dispatching' || cloud.phase === 'uploading'}
+            onClick={() => { setExportAspect(aspect); setExportStarted(false); setShowExport(true); }}>
             生成高清 MP4
           </button>
         </div>
@@ -207,11 +235,14 @@ export const ImageMotion: React.FC = () => {
               <span className="muted">{sel && !sel.effect ? '已框选区域 → 在右侧为它选择一个动画效果' : '继续在图片上框选其他区域，或点击右侧「预览」查看效果'}</span>
             </div>
           )}
-          <div style={{ maxHeight: isTall ? '72vh' : undefined, overflowY: isTall ? 'auto' : undefined, borderRadius: 12 }}>
+          <div className="canvas-scroll" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
             <div
               ref={canvasRef}
               className="canvas-wrap"
-              style={{ width: dispW, cursor: 'crosshair' }}
+              style={{
+                width: '100%', maxWidth: image.w,
+                aspectRatio: `${image.w} / ${image.h}`, cursor: 'crosshair',
+              }}
               onMouseDown={onMouseDown}
               onMouseMove={onMouseMove}
               onMouseUp={onMouseUp}
@@ -223,8 +254,8 @@ export const ImageMotion: React.FC = () => {
                   key={it.id}
                   className={`region-box ${selected === it.id ? 'selected' : ''}`}
                   style={{
-                    left: it.region.x * dispScale, top: it.region.y * dispScale,
-                    width: it.region.w * dispScale, height: it.region.h * dispScale,
+                    left: px(it.region.x), top: py(it.region.y),
+                    width: px(it.region.w), height: py(it.region.h),
                   }}
                   onClick={(e) => { e.stopPropagation(); setSelected(it.id); }}
                 >
@@ -233,10 +264,10 @@ export const ImageMotion: React.FC = () => {
               ))}
               {drawing && (
                 <div className="draw-box" style={{
-                  left: Math.min(drawing.x0, drawing.x1) * dispScale,
-                  top: Math.min(drawing.y0, drawing.y1) * dispScale,
-                  width: Math.abs(drawing.x1 - drawing.x0) * dispScale,
-                  height: Math.abs(drawing.y1 - drawing.y0) * dispScale,
+                  left: px(Math.min(drawing.x0, drawing.x1)),
+                  top: py(Math.min(drawing.y0, drawing.y1)),
+                  width: px(Math.abs(drawing.x1 - drawing.x0)),
+                  height: py(Math.abs(drawing.y1 - drawing.y0)),
                 }} />
               )}
             </div>
@@ -341,28 +372,82 @@ export const ImageMotion: React.FC = () => {
         </div>
       )}
 
-      {/* 生成弹层：选择输出比例 */}
-      {showExport && (
-        <div className="modal-mask" onClick={() => setShowExport(false)}>
-          <div className="card col" style={{ width: 420, maxWidth: '92vw', gap: 14 }} onClick={(e) => e.stopPropagation()}>
-            <b>生成高清 MP4</b>
-            <span className="muted">选择最终视频的画布比例（原图会完整显示，不裁切；不足部分留背景色）：</span>
-            <div className="col" style={{ gap: 8 }}>
-              {(Object.keys(ASPECTS) as AspectKey[]).map((k) => (
-                <button key={k} className={exportAspect === k ? 'primary' : 'ghost'} style={{ textAlign: 'left', padding: '10px 14px' }}
-                  onClick={() => setExportAspect(k)}>
-                  {k}{ { '16:9': ' 横屏', '9:16': ' 竖屏', '3:4': ' 竖版' }[k] }
-                  <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{ASPECTS[k].w}×{ASPECTS[k].h}</span>
-                </button>
-              ))}
-            </div>
-            <div className="row" style={{ justifyContent: 'flex-end' }}>
-              <button className="ghost" onClick={() => setShowExport(false)}>取消</button>
-              <button className="primary" onClick={startExport}>开始生成</button>
+      {/* 生成弹层：选比例 → 就地在弹窗内显示进度/成功/失败（点击「开始生成」绝不静默） */}
+      {showExport && (() => {
+        const cur = EXPORT_STEPS.findIndex((s) => s.key === cloud.phase);
+        const finished = cloud.phase === 'done';
+        return (
+          <div className="modal-mask" onClick={() => { if (!exportRunning) closeExport(); }}>
+            <div className="glass col" style={{ width: 440, maxWidth: '92vw', gap: 14, padding: 22 }}
+              onClick={(e) => e.stopPropagation()}>
+              <b style={{ fontSize: 16 }}>生成高清 MP4</b>
+
+              {!exportStarted ? (
+                <>
+                  <span className="muted">选择最终视频的画布比例（原图会完整显示，不裁切；不足部分留背景色）：</span>
+                  <div className="col" style={{ gap: 8 }}>
+                    {(Object.keys(ASPECTS) as AspectKey[]).map((k) => (
+                      <button key={k} className={exportAspect === k ? 'primary' : 'ghost'} style={{ textAlign: 'left', padding: '10px 14px' }}
+                        onClick={() => setExportAspect(k)}>
+                        {k}{ { '16:9': ' 横屏', '9:16': ' 竖屏', '3:4': ' 竖版' }[k] }
+                        <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{ASPECTS[k].w}×{ASPECTS[k].h}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : cloud.phase === 'error' ? (
+                <>
+                  <span className="muted">输出比例 {exportAspect} · {ASPECTS[exportAspect].w}×{ASPECTS[exportAspect].h}</span>
+                  <div style={{ border: '1px solid var(--danger)', background: 'rgba(248,113,113,0.12)', borderRadius: 10, padding: '12px 14px' }}>
+                    <b style={{ color: 'var(--danger)' }}>生成失败</b>
+                    <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6, wordBreak: 'break-word' }}>
+                      {cloud.message || '未知错误，请到 GitHub Actions 查看日志'}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="muted">输出比例 {exportAspect} · {ASPECTS[exportAspect].w}×{ASPECTS[exportAspect].h}</span>
+                  <div className="col" style={{ gap: 0 }}>
+                    {EXPORT_STEPS.map((s, i) => {
+                      const st = finished || i < cur ? 'done' : i === cur ? 'doing' : '';
+                      return (
+                        <div key={s.key} className={`export-step ${st}`}>
+                          <span className="dot">{st === 'done' ? '✓' : i + 1}</span>
+                          <span>{s.label}</span>
+                          {i === cur && !finished && <span className="muted" style={{ marginLeft: 'auto' }}>{cloud.message}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="bar" style={{ marginTop: 10 }}>
+                    <div style={{ width: `${Math.round(((finished ? EXPORT_STEPS.length : cur + 1) / EXPORT_STEPS.length) * 100)}%` }} />
+                  </div>
+                  {finished && (
+                    <div style={{ border: '1px solid var(--green)', background: 'rgba(74,222,128,0.12)', borderRadius: 10, padding: '12px 14px', marginTop: 6 }}>
+                      <b style={{ color: 'var(--green)' }}>已完成</b>
+                      <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6, wordBreak: 'break-word' }}>{cloud.message}</div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="export-actions">
+                {exportRunning ? (
+                  <button className="ghost" disabled>生成中，请勿关闭…</button>
+                ) : exportStarted ? (
+                  <button className="primary" onClick={closeExport}>{finished ? '完成' : '关闭'}</button>
+                ) : (
+                  <>
+                    <button className="ghost" onClick={closeExport}>取消</button>
+                    <button className="primary" onClick={startExport}>开始生成</button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

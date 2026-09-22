@@ -17,11 +17,13 @@ on:
         default: ''
   push:
     branches: [main]
+    # 注意：不要再加 'public/**'。App 渲染前会把图片临时推进 public/uploads/，
+    # 一旦纳入 paths，每次生成视频都会额外触发 2 个无用渲染任务，白烧 Actions 分钟。
+    # （云端渲染一律走 workflow_dispatch + specJson，不依赖 push 触发）
     paths:
       - 'src/**'
       - 'jobs/**'
       - 'scripts/**'
-      - 'public/**'
       - '.github/workflows/**'
       - 'package.json'
 
