@@ -1,5 +1,14 @@
-// 功能A spec 构建：画布框选区域 + 效果配置 + 顺序/节奏 → AnimSpec
+// 功能A spec 构建：画布框选区域 + 动作序列 → AnimSpec
 // 坐标约定：区域以原图像素记录；画布尺寸按输出比例；底图 contain 居中（完整显示不裁切，不足区域留背景）→ 区域副本按同一 scale/offset 映射。
+//
+// V2 数据模型：
+//   Region = 一个 imageRegion 元素 + 一串 Action（AItem.actions[]）
+//   每条 Action 是 V1 24 个封闭动作之一，可独立设置 intensity / direction / hold
+//   "hold" = 动画结束态停留时长（让动作不像特效集合，而像一段编排）
+//   "gap"  = 链内相邻 action 之间的过渡间距
+//   region 之间的先后关系仍走 同时 / 接着 / 稍后
+//
+// 引擎层（SpecComposition + compile.ts）不需改：每条 SpecAction 独立 at/duration，按 at 排序即可。
 import type { ActionName, AnimSpec, Region, SpecAction, SpecElement } from '../../../src/spec/types';
 
 export type AspectKey = '16:9' | '9:16' | '3:4';
@@ -11,7 +20,7 @@ export const ASPECTS: Record<AspectKey, { w: number; h: number }> = {
 
 export type AEffectCategory = '出现' | '强调' | '标记' | '镜头' | '消失';
 
-// 功能A 对光栅图开放的效果（slideIn/move/slideOut 因原图残留不开放；typeIn 不适用）
+// 功能A 对光栅图开放的效果
 export const A_EFFECTS: Record<AEffectCategory, { label: string; action: ActionName; needsDir?: boolean; camera?: boolean }[]> = {
   出现: [
     { label: '淡入', action: 'fadeIn' },
@@ -36,30 +45,120 @@ export const A_EFFECTS: Record<AEffectCategory, { label: string; action: ActionN
   消失: [{ label: '淡出', action: 'fadeOut' }],
 };
 
+// ---------- V2 类型 ----------
+export type Speed = 'slow' | 'normal' | 'fast';
+export type Intensity = 'light' | 'normal' | 'strong';
+export type Direction = 'up' | 'down' | 'left' | 'right';
+export type Relation = 'same' | 'after' | 'later';
+export type Hold = 'none' | 'short' | 'long';
+
+// hold → 帧数（30fps 基准）
+export const HOLD_FRAMES: Record<Hold, number> = { none: 0, short: 12, long: 30 };
+// 链内相邻 action 默认间隔帧
+export const CHAIN_GAP_FRAMES = 6;
+// "稍后" 跨区间隔帧（0.6s）
+export const RELATION_LATER_GAP = 18;
+// 开场留白（0.4s）+ 结尾留白（1.2s）
+const HEAD_PADDING_FRAMES = 12;
+const TAIL_PADDING_FRAMES = 36;
+
+export interface AAction {
+  id: string;                       // UI key
+  action: ActionName;
+  intensity?: Intensity;            // 不设则用 item 默认
+  direction?: Direction;            // 不设则用 item 默认
+  hold?: Hold;                      // 默认 'short'
+}
+
 export interface AItem {
   id: string;
-  region: Region;          // 原图坐标
-  effect: ActionName | null;
-  speed: 'slow' | 'normal' | 'fast';
-  intensity: 'light' | 'normal' | 'strong';
-  direction: 'up' | 'down' | 'left' | 'right';
-  relation: 'same' | 'after' | 'later'; // 与上一项：同时/接着/稍后
-  isCamera: boolean;
+  region: Region;                   // 原图坐标
+  speed: Speed;
+  intensity: Intensity;
+  direction: Direction;
+  relation: Relation;               // 与上一项的关系
+  actions: AAction[];               // 动作序列
 }
+
+// 预设序列（一键加入）：未来智能编排可以在这里挂载自动生成的序列
+export interface APreset {
+  name: string;
+  actions: Omit<AAction, 'id'>[];
+}
+export const PRESETS: APreset[] = [
+  {
+    name: '关键词关注',
+    actions: [
+      { action: 'scaleEmphasis', hold: 'short' },
+      { action: 'circleMark', hold: 'long' },
+    ],
+  },
+  {
+    name: 'CTA 跳出',
+    actions: [
+      { action: 'popIn', hold: 'short' },
+      { action: 'pulse', hold: 'short' },
+    ],
+  },
+  {
+    name: '出现强调',
+    actions: [
+      { action: 'fadeIn', hold: 'short' },
+      { action: 'scaleEmphasis', hold: 'long' },
+    ],
+  },
+  {
+    name: '推近强调',
+    actions: [
+      { action: 'cameraPush', hold: 'short' },
+      { action: 'circleMark', hold: 'long' },
+      { action: 'cameraPull', hold: 'short' },
+    ],
+  },
+];
 
 export interface FitMap { scale: number; offsetX: number; offsetY: number }
 
-// contain：完整显示原图，不裁切；不足区域留在画布背景中
+// contain：完整显示原图，不裁切，不足区域留在画布背景中
 export function fitMap(iw: number, ih: number, cw: number, ch: number): FitMap {
   const scale = Math.min(cw / iw, ch / ih);
   return { scale, offsetX: (cw - iw * scale) / 2, offsetY: (ch - ih * scale) / 2 };
 }
 
-const SPEED_FRAMES: Record<string, number> = { slow: 27, normal: 18, fast: 11 };
-const CAMERA_FRAMES: Record<string, number> = { slow: 30, normal: 22, fast: 14 };
+const SPEED_FRAMES: Record<Speed, number> = { slow: 27, normal: 18, fast: 11 };
+const CAMERA_FRAMES: Record<Speed, number> = { slow: 30, normal: 22, fast: 14 };
+
+// 单条 action 实际占用帧数 = 动画本身 + hold
+function actionTotalFrames(a: AAction, item: AItem): number {
+  const isCam = a.action.startsWith('camera') || a.action === 'focus';
+  const base = (isCam ? CAMERA_FRAMES : SPEED_FRAMES)[item.speed];
+  return base + HOLD_FRAMES[a.hold ?? 'short'];
+}
+
+// 把一条 AAction 展开成 SpecAction（不加 at，调用方计算）
+function emitSpecAction(
+  a: AAction, item: AItem, target: string, at: number, dur: number,
+): SpecAction {
+  const intensity = a.intensity ?? item.intensity;
+  const direction = a.direction ?? item.direction;
+  const speed = item.speed;
+  if (a.action === 'cameraPush' || a.action === 'focus') {
+    return { action: a.action, target: 'camera', at, duration: dur, region: undefined, dim: a.action === 'focus' ? 0.5 : undefined, speed, intensity };
+  }
+  if (a.action === 'cameraPull') {
+    return { action: 'cameraPull', target: 'camera', at, duration: dur, speed, intensity };
+  }
+  return {
+    action: a.action, target, at, duration: dur,
+    speed, intensity,
+    direction,
+    ...(a.action === 'highlight' ? { color: 'rgba(232,163,61,0.55)' } : {}),
+    ...(a.action === 'underlineDraw' || a.action === 'circleMark' ? { color: '#5EA8FF' } : {}),
+  };
+}
 
 export function buildSpecA(opts: {
-  imageSrc: string;           // 预览 dataURL；云端 uploads/ 路径
+  imageSrc: string;
   imageW: number;
   imageH: number;
   aspect: AspectKey;
@@ -83,47 +182,63 @@ export function buildSpecA(opts: {
     h: Math.round(r.h * map.scale),
   });
 
-  let cursor = Math.round(0.4 * fps); // 开场留 0.4s
-  let prevAt = cursor;
+  let cursor = HEAD_PADDING_FRAMES;
+  let prevChainStart = cursor;
+  let prevChainEnd = cursor;
+
   items.forEach((it, idx) => {
-    if (!it.effect) return;
+    if (it.actions.length === 0) return;
     const elId = `r${idx}`;
     const cr = toCanvas(it.region);
-    const isCam = it.isCamera;
-    if (!isCam) {
+    const hasNonCameraAction = it.actions.some((a) => !a.action.startsWith('camera') && a.action !== 'focus');
+    if (hasNonCameraAction) {
       elements.push({
         id: elId, kind: 'imageRegion',
         x: cr.x, y: cr.y, w: cr.w, h: cr.h,
         src: imageSrc, imageW, imageH, region: it.region, z: 2,
       });
     }
-    const dur = (isCam ? CAMERA_FRAMES : SPEED_FRAMES)[it.speed];
-    const at = idx === 0 ? cursor
-      : it.relation === 'same' ? prevAt
-      : it.relation === 'later' ? cursor + Math.round(0.6 * fps)
-      : cursor;
-    if (it.effect === 'cameraPush' || it.effect === 'focus') {
-      actions.push({ action: it.effect, target: 'camera', at, duration: dur, region: cr, dim: 0.5, speed: it.speed });
-    } else if (it.effect === 'cameraPull') {
-      actions.push({ action: 'cameraPull', target: 'camera', at, duration: dur, speed: it.speed });
-    } else {
-      actions.push({
-        action: it.effect, target: elId, at, duration: dur,
-        speed: it.speed, intensity: it.intensity,
-        direction: it.direction,
-        ...(it.effect === 'highlight' ? { color: 'rgba(232,163,61,0.55)' } : {}),
-        ...(it.effect === 'underlineDraw' || it.effect === 'circleMark' ? { color: '#5EA8FF' } : {}),
-      });
-    }
-    prevAt = at;
-    cursor = Math.max(cursor, at + dur); // 同时项不推迟后续，除非它结束更晚
+
+    let chainStart: number;
+    if (idx === 0) chainStart = cursor;
+    else if (it.relation === 'same') chainStart = prevChainStart;
+    else if (it.relation === 'later') chainStart = prevChainStart + RELATION_LATER_GAP;
+    else chainStart = prevChainEnd;
+
+    let t = chainStart;
+    it.actions.forEach((a, i) => {
+      const dur = actionTotalFrames(a, it);
+      const target = a.action.startsWith('camera') || a.action === 'focus' ? 'camera' : elId;
+      if (a.action === 'cameraPush' || a.action === 'focus') {
+        const sp = emitSpecAction(a, it, target, t, dur);
+        sp.region = cr;
+        actions.push(sp);
+      } else {
+        actions.push(emitSpecAction(a, it, target, t, dur));
+      }
+      t += dur;
+      if (i < it.actions.length - 1) t += CHAIN_GAP_FRAMES;
+    });
+
+    prevChainStart = chainStart;
+    prevChainEnd = t;
+    cursor = Math.max(cursor, t);
   });
 
-  const durationInFrames = cursor + Math.round(1.2 * fps); // 结尾停留 1.2s
+  const durationInFrames = cursor + TAIL_PADDING_FRAMES;
   return {
     version: 1,
     meta: { width: cw, height: ch, fps, durationInFrames, title: '让图片动起来' },
     elements,
     actions,
   };
+}
+
+// ---------- 工具 ----------
+export function effectByName(name: ActionName): { label: string; category: AEffectCategory; camera: boolean; needsDir: boolean } | null {
+  for (const [cat, list] of Object.entries(A_EFFECTS) as [AEffectCategory, typeof A_EFFECTS[AEffectCategory]][]) {
+    const found = list.find((e) => e.action === name);
+    if (found) return { label: found.label, category: cat, camera: !!found.camera, needsDir: !!found.needsDir };
+  }
+  return null;
 }

@@ -1,0 +1,27 @@
+{
+  "composition": "Spec",
+  "description": "④ 端到端验证：真实 6s 动画（出现→圈出→推近聚焦→拉远→强调→收尾），预览与 GitHub Actions 成片对照",
+  "concurrency": 1,
+  "stills": [0, 30, 75, 110, 140, 172, 179],
+  "encode": { "imageFormat": "png", "crf": 18 },
+  "spec": {
+    "version": 1,
+    "meta": { "width": 1920, "height": 1080, "fps": 30, "durationInFrames": 180, "title": "chenstricks 6s 端到端验证" },
+    "elements": [
+      { "id": "base", "kind": "image", "x": 0, "y": 0, "w": 1920, "h": 1080, "src": "assets/sample-design.png", "imageW": 1920, "imageH": 1080, "fit": "contain", "z": 0 },
+      { "id": "r-title", "kind": "imageRegion", "x": 90, "y": 196, "w": 580, "h": 180, "src": "assets/sample-design.png", "imageW": 1920, "imageH": 1080, "region": { "x": 90, "y": 196, "w": 580, "h": 180 }, "z": 2 },
+      { "id": "r-keyword", "kind": "imageRegion", "x": 100, "y": 480, "w": 440, "h": 210, "src": "assets/sample-design.png", "imageW": 1920, "imageH": 1080, "region": { "x": 100, "y": 480, "w": 440, "h": 210 }, "z": 2 },
+      { "id": "r-card", "kind": "imageRegion", "x": 1060, "y": 272, "w": 760, "h": 560, "src": "assets/sample-design.png", "imageW": 1920, "imageH": 1080, "region": { "x": 1060, "y": 272, "w": 760, "h": 560 }, "z": 1 },
+      { "id": "r-button", "kind": "imageRegion", "x": 1060, "y": 842, "w": 330, "h": 140, "src": "assets/sample-design.png", "imageW": 1920, "imageH": 1080, "region": { "x": 1060, "y": 842, "w": 330, "h": 140 }, "z": 2 }
+    ],
+    "actions": [
+      { "action": "fadeIn", "target": "r-title", "at": 10, "duration": 22, "intensity": "normal" },
+      { "action": "circleMark", "target": "r-keyword", "at": 45, "duration": 28, "color": "#5EA8FF" },
+      { "action": "cameraPush", "target": "camera", "at": 80, "duration": 30, "region": { "x": 1060, "y": 272, "w": 760, "h": 560 }, "speed": "slow" },
+      { "action": "focus", "target": "camera", "at": 80, "duration": 30, "region": { "x": 1060, "y": 272, "w": 760, "h": 560 }, "dim": 0.5 },
+      { "action": "cameraPull", "target": "camera", "at": 115, "duration": 28 },
+      { "action": "scaleEmphasis", "target": "r-button", "at": 150, "duration": 22, "intensity": "strong" },
+      { "action": "reveal", "target": "r-title", "at": 170, "duration": 22, "direction": "right", "intensity": "normal" }
+    ]
+  }
+}

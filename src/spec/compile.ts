@@ -2,7 +2,9 @@
 import { ACTION_NAMES, AnimSpec, Beat, Intensity, SpecAction, Speed } from './types';
 
 export const SPEED_MS: Record<Speed, number> = { slow: 900, normal: 600, fast: 350 };
-export const INTENSITY_SCALE: Record<Intensity, number> = { light: 0.6, normal: 1, strong: 1.5 };
+// 三档必须肉眼可分：原来 0.6 / 1 / 1.5 的差距在各动作的振幅里被稀释，
+// 轻=看不出、明显=不够。拉开到 0.5 / 1 / 1.9，各动作再按自己的振幅常数放大。
+export const INTENSITY_SCALE: Record<Intensity, number> = { light: 0.5, normal: 1, strong: 1.9 };
 
 // 各 action 的默认持续（毫秒，speed=normal 基准；实际 = default * speedFactor）
 const DEFAULT_DUR_MS: Partial<Record<SpecAction['action'], number>> = {
