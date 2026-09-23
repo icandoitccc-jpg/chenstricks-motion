@@ -85,11 +85,34 @@ export interface APreset {
   name: string;
   actions: Omit<AAction, 'id'>[];
 }
+// 主路径「感觉」卡片：用户只选感觉，系统按 recipe 自动编排动作序列。
+// 数据写死、无 AI/API/Token，符合免费运行原则。buildSpecA 引擎逻辑不依赖这里的具体内容。
 export const PRESETS: APreset[] = [
   {
-    name: '关键词关注',
+    name: '关键词强调',
     actions: [
+      { action: 'fadeIn', hold: 'short' },
       { action: 'scaleEmphasis', hold: 'short' },
+      { action: 'circleMark', hold: 'long' },
+    ],
+  },
+  {
+    name: '轻轻出现',
+    actions: [
+      { action: 'fadeIn', hold: 'short' },
+      { action: 'scaleEmphasis', hold: 'long' },
+    ],
+  },
+  {
+    name: '镜头靠近',
+    actions: [
+      { action: 'cameraPush', hold: 'short' },
+      { action: 'scaleEmphasis', hold: 'long' },
+    ],
+  },
+  {
+    name: '标记一下',
+    actions: [
       { action: 'circleMark', hold: 'long' },
     ],
   },
@@ -97,22 +120,7 @@ export const PRESETS: APreset[] = [
     name: 'CTA 跳出',
     actions: [
       { action: 'popIn', hold: 'short' },
-      { action: 'pulse', hold: 'short' },
-    ],
-  },
-  {
-    name: '出现强调',
-    actions: [
-      { action: 'fadeIn', hold: 'short' },
-      { action: 'scaleEmphasis', hold: 'long' },
-    ],
-  },
-  {
-    name: '推近强调',
-    actions: [
-      { action: 'cameraPush', hold: 'short' },
-      { action: 'circleMark', hold: 'long' },
-      { action: 'cameraPull', hold: 'short' },
+      { action: 'pulse', hold: 'long' },
     ],
   },
 ];

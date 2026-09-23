@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Region } from '../../../src/spec/types';
 import {
   A_EFFECTS, AAction, AEffectCategory, AItem, AspectKey, ASPECTS,
-  buildSpecA, effectByName, Hold, PRESETS, Relation, Speed, Intensity,
+  buildSpecA, effectByName, Direction, Hold, PRESETS, Relation, Speed, Intensity,
 } from '../lib/spec-builder-a';
 import { PreviewPlayer } from '../components/PreviewPlayer';
 import { useCloudRender } from '../lib/useCloudRender';
@@ -25,15 +25,37 @@ const EXPORT_STEPS = [
 
 const HOLD_LABEL: Record<Hold, string> = { none: '无', short: '短', long: '长' };
 const RELATION_LABEL: Record<Relation, string> = { same: '同时', after: '接着', later: '稍后' };
-const SPEED_LABEL: Record<Speed, string> = { slow: '慢', normal: '正常', fast: '快' };
 const INTENSITY_LABEL: Record<Intensity, string> = { light: '轻', normal: '正常', strong: '明显' };
+const DIRECTION_LABEL: Record<Direction, string> = { up: '上', down: '下', left: '左', right: '右' };
+
+// 用户层唯一节奏旋钮：紧凑/正常/舒缓 → 系统翻译成 speed + intensity + hold 长短。
+// 取代原本区域级「速度+强度」和每个 Action 的「无/短/长」，消除两套强度的困惑。
+type Rhythm = '紧凑' | '正常' | '舒缓';
+const RHYTHM: Record<Rhythm, { speed: Speed; intensity: Intensity }> = {
+  紧凑: { speed: 'fast', intensity: 'strong' },
+  正常: { speed: 'normal', intensity: 'normal' },
+  舒缓: { speed: 'slow', intensity: 'light' },
+};
+const RHYTHM_ORDER: Rhythm[] = ['紧凑', '正常', '舒缓'];
+function rhythmOf(speed: Speed): Rhythm {
+  if (speed === 'fast') return '紧凑';
+  if (speed === 'slow') return '舒缓';
+  return '正常';
+}
+// 在 recipe 默认 hold 之上整体缩放：紧凑偏短、舒缓偏长、正常保持。
+function adjustHold(base: Hold, rhythm: Rhythm): Hold {
+  if (rhythm === '紧凑') return base === 'long' ? 'short' : 'none';
+  if (rhythm === '舒缓') return base === 'none' ? 'short' : 'long';
+  return base;
+}
 
 export const ImageMotion: React.FC = () => {
   const [image, setImage] = useState<ImageState | null>(null);
   const [aspect, setAspect] = useState<AspectKey>('16:9');
   const [items, setItems] = useState<AItem[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [editingActionId, setEditingActionId] = useState<string | null>(null);
+  const [feelingByItem, setFeelingByItem] = useState<Record<string, string>>({});
+  const [detailsFor, setDetailsFor] = useState<string | null>(null);
   const [addingCategory, setAddingCategory] = useState<AEffectCategory>('出现');
   const [drawing, setDrawing] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -114,7 +136,6 @@ export const ImageMotion: React.FC = () => {
       actions: [],
     }]);
     setSelected(id);
-    setEditingActionId(null);
   };
 
   const updateItem = (id: string, patch: Partial<AItem>) => {
@@ -122,7 +143,9 @@ export const ImageMotion: React.FC = () => {
   };
   const removeItem = (id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
-    if (selected === id) { setSelected(null); setEditingActionId(null); }
+    if (selected === id) setSelected(null);
+    if (detailsFor === id) setDetailsFor(null);
+    setFeelingByItem((prev) => { const n = { ...prev }; delete n[id]; return n; });
   };
   const moveItem = (id: string, dir: -1 | 1) => {
     setItems((prev) => {
@@ -135,12 +158,43 @@ export const ImageMotion: React.FC = () => {
     });
   };
 
+  // 选一个「感觉」→ 系统按 recipe 自动生成动作序列；节奏决定 speed/intensity/hold。
+  const applyFeeling = (itemId: string, presetIdx: number, rhythm: Rhythm) => {
+    const p = PRESETS[presetIdx];
+    const r = RHYTHM[rhythm];
+    const acts: AAction[] = p.actions.map((a) => ({
+      id: newActionId(),
+      action: a.action,
+      intensity: a.intensity,
+      direction: a.direction,
+      hold: adjustHold(a.hold ?? 'short', rhythm),
+    }));
+    updateItem(itemId, { actions: acts, speed: r.speed, intensity: r.intensity });
+    setFeelingByItem((prev) => ({ ...prev, [itemId]: p.name }));
+  };
+  // 改节奏：若仍来自某个 feeling，按 recipe 重新生成（保持序列结构）；否则直接缩放当前动作的 hold。
+  const setRhythm = (itemId: string, rhythm: Rhythm) => {
+    const r = RHYTHM[rhythm];
+    const feeling = feelingByItem[itemId];
+    if (feeling) {
+      const idx = PRESETS.findIndex((p) => p.name === feeling);
+      if (idx >= 0) { applyFeeling(itemId, idx, rhythm); return; }
+    }
+    setItems((prev) => prev.map((i) => i.id !== itemId ? i : ({
+      ...i, speed: r.speed, intensity: r.intensity,
+      actions: i.actions.map((a) => ({ ...a, hold: adjustHold(a.hold ?? 'short', rhythm) })),
+    })));
+  };
+  const clearFeeling = (itemId: string) => {
+    setFeelingByItem((prev) => { const n = { ...prev }; delete n[itemId]; return n; });
+  };
+
   const addActionToChain = (itemId: string, actionName: AAction['action']) => {
     const item = items.find(i => i.id === itemId);
     if (!item) return;
     const newAct: AAction = { id: newActionId(), action: actionName };
     updateItem(itemId, { actions: [...item.actions, newAct] });
-    setEditingActionId(newAct.id);
+    clearFeeling(itemId);
   };
   const updateAction = (itemId: string, actionId: string, patch: Partial<AAction>) => {
     setItems((prev) => prev.map((i) => i.id !== itemId ? i : {
@@ -151,7 +205,7 @@ export const ImageMotion: React.FC = () => {
     setItems((prev) => prev.map((i) => i.id !== itemId ? i : {
       ...i, actions: i.actions.filter((a) => a.id !== actionId),
     }));
-    if (editingActionId === actionId) setEditingActionId(null);
+    clearFeeling(itemId);
   };
   const moveActionInChain = (itemId: string, actionId: string, dir: -1 | 1) => {
     setItems((prev) => prev.map((i) => {
@@ -163,12 +217,7 @@ export const ImageMotion: React.FC = () => {
       [arr[idx], arr[j]] = [arr[j], arr[idx]];
       return { ...i, actions: arr };
     }));
-  };
-  const applyPreset = (itemId: string, presetIdx: number) => {
-    const p = PRESETS[presetIdx];
-    const acts: AAction[] = p.actions.map((a) => ({ id: newActionId(), ...a }));
-    updateItem(itemId, { actions: acts });
-    setEditingActionId(acts[acts.length - 1]?.id ?? null);
+    clearFeeling(itemId);
   };
 
   const spec = useMemo(() => {
@@ -266,7 +315,7 @@ export const ImageMotion: React.FC = () => {
             <div className="card" style={{ marginBottom: 12, padding: '10px 16px' }}>
               <span className="muted">
                 {sel && sel.actions.length === 0
-                  ? '已框选区域 → 在右侧为它添加动作，或先试一个预设序列'
+                  ? '已框选区域 → 在右侧选一个「想让这里怎么动」的效果'
                   : '继续在图片上框选其他区域，或点击右侧「预览」查看效果'}
               </span>
             </div>
@@ -293,7 +342,7 @@ export const ImageMotion: React.FC = () => {
                     left: px(it.region.x), top: py(it.region.y),
                     width: px(it.region.w), height: py(it.region.h),
                   }}
-                  onClick={(e) => { e.stopPropagation(); setSelected(it.id); setEditingActionId(null); }}
+                  onClick={(e) => { e.stopPropagation(); setSelected(it.id); }}
                 >
                   <span className="idx">{idx + 1}</span>
                 </div>
@@ -313,121 +362,121 @@ export const ImageMotion: React.FC = () => {
 
         <div className="col" style={{ gap: 14 }}>
           {sel ? (
-            <div className="card col" style={{ gap: 12 }}>
-              <b>动作序列 · 区域 {items.findIndex((i) => i.id === sel.id) + 1}</b>
+            <div className="card col" style={{ gap: 14 }}>
+              <b>区域 {items.findIndex((i) => i.id === sel.id) + 1} · 想让这里怎么动？</b>
 
+              {/* 主路径：选一种感觉，系统按 recipe 自动编排动作序列 */}
+              <div className="effect-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+                {PRESETS.map((p, i) => {
+                  const active = feelingByItem[sel.id] === p.name;
+                  return (
+                    <button key={p.name} className={`effect-btn ${active ? 'active' : ''}`}
+                      onClick={() => applyFeeling(sel.id, i, rhythmOf(sel.speed))}>
+                      {p.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 整体节奏：唯一用户层旋钮，取代原区域级速度/强度 + 每个动作的无/短/长 */}
               <div className="row">
-                <span className="muted" style={{ fontSize: 12 }}>速度</span>
+                <span className="muted" style={{ fontSize: 12 }}>整体节奏</span>
                 <span className="seg">
-                  {(['slow', 'normal', 'fast'] as const).map((s) => (
-                    <button key={s} className={sel.speed === s ? 'active' : ''} onClick={() => updateItem(sel.id, { speed: s })}>
-                      {SPEED_LABEL[s]}
-                    </button>
-                  ))}
-                </span>
-                <span className="muted" style={{ fontSize: 12 }}>强度</span>
-                <span className="seg">
-                  {(['light', 'normal', 'strong'] as const).map((s) => (
-                    <button key={s} className={sel.intensity === s ? 'active' : ''} onClick={() => updateItem(sel.id, { intensity: s })}>
-                      {INTENSITY_LABEL[s]}
-                    </button>
+                  {RHYTHM_ORDER.map((ry) => (
+                    <button key={ry} className={rhythmOf(sel.speed) === ry ? 'active' : ''}
+                      onClick={() => setRhythm(sel.id, ry)}>{ry}</button>
                   ))}
                 </span>
               </div>
 
-              {sel.actions.length === 0 ? (
-                <div className="card muted" style={{ padding: '10px 12px', fontSize: 13 }}>
-                  这个区域还没有动作。在下面选一个效果，或直接用预设序列。
-                </div>
-              ) : (
-                <div className="col" style={{ gap: 6 }}>
-                  {sel.actions.map((a, idx) => {
-                    const e = effectByName(a.action);
-                    const editing = editingActionId === a.id;
-                    return (
-                      <div key={a.id} className="card" style={{ padding: '8px 10px', gap: 6, background: editing ? 'rgba(232,163,61,0.08)' : undefined, borderColor: editing ? 'var(--accent)' : undefined }}>
-                        <div className="row" style={{ gap: 6 }}>
-                          <span style={{ width: 18, height: 18, borderRadius: 9, background: 'var(--accent)', color: '#1a1408', fontWeight: 700, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{idx + 1}</span>
-                          <span style={{ flex: 1, fontWeight: 600 }}>{e?.label ?? a.action}</span>
-                          <span className="seg">
-                            {(['none', 'short', 'long'] as const).map((h) => (
-                              <button key={h} className={a.hold === h ? 'active' : ''} title={`保持${HOLD_LABEL[h]}`}
-                                onClick={() => updateAction(sel.id, a.id, { hold: h })}>
-                                {HOLD_LABEL[h]}
-                              </button>
-                            ))}
-                          </span>
-                          <button className="ghost" style={{ padding: '0 6px' }} onClick={() => moveActionInChain(sel.id, a.id, -1)}>↑</button>
-                          <button className="ghost" style={{ padding: '0 6px' }} onClick={() => moveActionInChain(sel.id, a.id, 1)}>↓</button>
-                          <button className="ghost" style={{ padding: '0 8px', color: 'var(--danger)' }} onClick={() => removeAction(sel.id, a.id)}>×</button>
-                        </div>
-                        {editing && (
-                          <div className="col" style={{ gap: 6 }}>
-                            <div className="row" style={{ gap: 6 }}>
-                              <span className="muted" style={{ fontSize: 12 }}>强度</span>
-                              <span className="seg">
-                                {(['light', 'normal', 'strong'] as const).map((s) => (
-                                  <button key={s} className={a.intensity === s ? 'active' : ''} onClick={() => updateAction(sel.id, a.id, { intensity: s })}>
-                                    {INTENSITY_LABEL[s]}
-                                  </button>
-                                ))}
-                              </span>
-                            </div>
+              {/* 状态 */}
+              <div className="card muted" style={{ padding: '10px 12px', fontSize: 13 }}>
+                {sel.actions.length === 0
+                  ? '选一个效果，系统会自动编排动作序列'
+                  : feelingByItem[sel.id]
+                    ? `${feelingByItem[sel.id]} · ${chainSummary(sel)}`
+                    : chainSummary(sel)}
+              </div>
+
+              {/* 调整细节 ›：只有想折腾的人才展开，看到完整 Action Sequence */}
+              <button className="ghost" style={{ alignSelf: 'flex-start', fontSize: 13 }}
+                onClick={() => setDetailsFor(detailsFor === sel.id ? null : sel.id)}>
+                {detailsFor === sel.id ? '收起调整细节 ∧' : '调整细节 ›'}
+              </button>
+
+              {detailsFor === sel.id && (
+                <div className="col" style={{ gap: 10, borderTop: '1px solid var(--stroke)', paddingTop: 12 }}>
+                  <span className="muted" style={{ fontSize: 12 }}>系统生成的动作序列（想改就改，不改直接用）：</span>
+                  <div className="col" style={{ gap: 6 }}>
+                    {sel.actions.map((a, idx) => {
+                      const e = effectByName(a.action);
+                      return (
+                        <div key={a.id} className="card" style={{ padding: '8px 10px', gap: 6 }}>
+                          <div className="row" style={{ gap: 6 }}>
+                            <span style={{ width: 18, height: 18, borderRadius: 9, background: 'var(--accent)', color: '#1a1408', fontWeight: 700, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{idx + 1}</span>
+                            <span style={{ flex: 1, fontWeight: 600 }}>{e?.label ?? a.action}</span>
+                            <span className="seg">
+                              {(['none', 'short', 'long'] as const).map((h) => (
+                                <button key={h} className={a.hold === h ? 'active' : ''} title={`保持${HOLD_LABEL[h]}`}
+                                  onClick={() => updateAction(sel.id, a.id, { hold: h })}>
+                                  {HOLD_LABEL[h]}
+                                </button>
+                              ))}
+                            </span>
+                            <button className="ghost" style={{ padding: '0 6px' }} onClick={() => moveActionInChain(sel.id, a.id, -1)}>↑</button>
+                            <button className="ghost" style={{ padding: '0 6px' }} onClick={() => moveActionInChain(sel.id, a.id, 1)}>↓</button>
+                            <button className="ghost" style={{ padding: '0 8px', color: 'var(--danger)' }} onClick={() => removeAction(sel.id, a.id)}>×</button>
+                          </div>
+                          <div className="row" style={{ gap: 6, marginTop: 6 }}>
+                            <span className="muted" style={{ fontSize: 12 }}>强度</span>
+                            <span className="seg">
+                              {(['light', 'normal', 'strong'] as const).map((s) => (
+                                <button key={s} className={a.intensity === s ? 'active' : ''} onClick={() => updateAction(sel.id, a.id, { intensity: s })}>
+                                  {INTENSITY_LABEL[s]}
+                                </button>
+                              ))}
+                            </span>
                             {e?.needsDir && (
-                              <div className="row" style={{ gap: 6 }}>
+                              <>
                                 <span className="muted" style={{ fontSize: 12 }}>方向</span>
                                 <span className="seg">
                                   {(['up', 'down', 'left', 'right'] as const).map((d) => (
                                     <button key={d} className={a.direction === d ? 'active' : ''} onClick={() => updateAction(sel.id, a.id, { direction: d })}>
-                                      {{ up: '上', down: '下', left: '左', right: '右' }[d]}
+                                      {DIRECTION_LABEL[d]}
                                     </button>
                                   ))}
                                 </span>
-                              </div>
+                              </>
                             )}
                           </div>
-                        )}
-                        <button className="ghost" style={{ padding: '0 6px', fontSize: 11, alignSelf: 'flex-end' }}
-                          onClick={() => setEditingActionId(editing ? null : a.id)}>
-                          {editing ? '收起' : '调整'}
+                        </div>
+                      );
+                    })}
+                    {sel.actions.length === 0 && <span className="muted" style={{ fontSize: 13 }}>还没有动作。</span>}
+                  </div>
+
+                  {/* 添加动作：自由拼一条链（高级） */}
+                  <div className="col" style={{ gap: 6 }}>
+                    <span className="muted" style={{ fontSize: 12 }}>添加动作（自由拼一条链）：</span>
+                    <div className="row" style={{ flexWrap: 'wrap', gap: 4 }}>
+                      {(Object.keys(A_EFFECTS) as AEffectCategory[]).map((c) => (
+                        <button key={c} className={addingCategory === c ? 'primary' : 'ghost'} style={{ padding: '3px 9px', fontSize: 12 }}
+                          onClick={() => setAddingCategory(c)}>{c}</button>
+                      ))}
+                    </div>
+                    <div className="effect-grid">
+                      {A_EFFECTS[addingCategory].map((e) => (
+                        <button key={e.action} className="effect-btn"
+                          onClick={() => addActionToChain(sel.id, e.action)}>
+                          {e.label}
                         </button>
-                      </div>
-                    );
-                  })}
+                      ))}
+                    </div>
+                  </div>
+
+                  <button className="ghost" style={{ color: 'var(--danger)', alignSelf: 'flex-start' }} onClick={() => removeItem(sel.id)}>删除此区域</button>
                 </div>
               )}
-
-              <div className="col" style={{ gap: 6 }}>
-                <span className="muted" style={{ fontSize: 12 }}>添加动作：</span>
-                <div className="row" style={{ flexWrap: 'wrap', gap: 4 }}>
-                  {(Object.keys(A_EFFECTS) as AEffectCategory[]).map((c) => (
-                    <button key={c} className={addingCategory === c ? 'primary' : 'ghost'} style={{ padding: '3px 9px', fontSize: 12 }}
-                      onClick={() => setAddingCategory(c)}>{c}</button>
-                  ))}
-                </div>
-                <div className="effect-grid">
-                  {A_EFFECTS[addingCategory].map((e) => (
-                    <button key={e.action} className="effect-btn"
-                      onClick={() => addActionToChain(sel.id, e.action)}>
-                      {e.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="col" style={{ gap: 6 }}>
-                <span className="muted" style={{ fontSize: 12 }}>预设序列（一键替换当前区域）：</span>
-                <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
-                  {PRESETS.map((p, i) => (
-                    <button key={p.name} className="ghost" style={{ padding: '4px 10px', fontSize: 12 }}
-                      onClick={() => applyPreset(sel.id, i)}>
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button className="ghost" style={{ color: 'var(--danger)', alignSelf: 'flex-start' }} onClick={() => removeItem(sel.id)}>删除此区域</button>
             </div>
           ) : (
             <div className="card muted">先框选一个区域，或点击画布上已有区域进行设置。</div>
