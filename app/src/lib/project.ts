@@ -15,7 +15,7 @@ export interface Project {
 export interface TimedScene extends Scene { start: number; end: number }
 export interface Issue { level: 'error' | 'warning'; message: string }
 export const uid = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
-export const newProject = (): Project => ({ version: 1, id: uid('project'), title: '我的口播项目', audioRevision: 0, width: 1920, height: 1080, fps: 30, captions: true, sentences: [], scenes: [], assets: [] });
+export const newProject = (): Project => ({ version: 1, id: uid('project'), title: '我的视频', audioRevision: 0, width: 1920, height: 1080, fps: 30, captions: true, sentences: [], scenes: [], assets: [] });
 export const newScene = (sentenceIds: string[] = []): Scene => ({ id: uid('scene'), title: '新画面', sentenceIds, kind: 'info', template: 'focus', items: [], leftLabel: '之前', rightLabel: '现在', sourceIn: 0, motion: 'push', focusX: 50, focusY: 50 });
 export const splitScript = (text: string): Sentence[] => (text.match(/[^。！？!?\n]+[。！？!?]?/g) ?? []).map(s => s.trim()).filter(Boolean).map((text, i) => ({ id: `S${String(i + 1).padStart(3, '0')}`, text, start: null, end: null }));
 export function formatTime(value: number) {
@@ -50,7 +50,7 @@ export function validateProject(p: Project, files?: Map<string, Blob>): Issue[] 
   const issues: Issue[] = []; const error = (message: string) => issues.push({ level: 'error', message });
   const warning = (message: string) => issues.push({ level: 'warning', message });
   const audio = p.assets.find(a => a.id === p.audioAssetId);
-  if (!audio) error('请导入最终旁白。');
+  if (!audio) error('请导入最终录音。');
   if (!p.sentences.length) error('请导入稿子或时间字幕。');
   const seen = new Set<string>(); let lastEnd = 0;
   for (const s of p.sentences) {
@@ -59,7 +59,7 @@ export function validateProject(p: Project, files?: Map<string, Blob>): Issue[] 
     if (!Number.isFinite(s.start) || !Number.isFinite(s.end) || s.start < 0 || s.end <= s.start) error(`${s.id} 时间无效。`);
     if (s.start < lastEnd - 0.001) error(`${s.id} 与上一句时间重叠或顺序错误。`);
     lastEnd = s.end;
-    if (audio?.duration && s.end > audio.duration + 0.05) error(`${s.id} 超出旁白长度。`);
+    if (audio?.duration && s.end > audio.duration + 0.05) error(`${s.id} 超出录音长度。`);
   }
   if (!p.scenes.length) error('请创建画面或导入 ChatGPT 场景方案。');
   const sceneIds = new Set<string>(); const owners = new Map<string, string>();
@@ -79,14 +79,14 @@ export function validateProject(p: Project, files?: Map<string, Blob>): Issue[] 
       const t = byScene.get(sc.id);
       if (a?.kind === 'video' && a.duration && t && sc.sourceIn + t.end - t.start > a.duration + 0.05) error(`${sc.title} 录屏剩余长度不足，请换素材、调整入点或缩短场景。`);
     } else {
-      if (!sc.title.trim()) error('信息动画需要标题。');
+      if (!sc.title.trim()) error('文字图解需要标题。');
       if (sc.items.length > 6) error(`${sc.title} 最多放6项，更多内容请拆成两个场景。`);
       if (sc.template === 'comparison' && sc.items.length !== 2) error(`${sc.title} 的对比模板需要恰好两项内容。`);
     }
   }
   for (const s of p.sentences) if (!owners.has(s.id)) error(`${s.id} 还没有画面。`);
   for (let i = 1; i < timed.length; i++) if (timed[i].start < timed[i - 1].end - 0.001) error('场景时间重叠。');
-  if (audio?.duration && timed.length && audio.duration - timed[timed.length - 1].end > 0.5) warning('旁白结尾有未分配画面的停留，导出会保持最后一幕。');
+  if (audio?.duration && timed.length && audio.duration - timed[timed.length - 1].end > 0.5) warning('录音结尾有未分配画面的停留，导出会保持最后一幕。');
   const used = new Set([p.audioAssetId, ...p.scenes.filter(s => s.kind !== 'info').map(s => s.assetId)].filter(Boolean));
   if (files) for (const id of used) if (!files.has(id!)) error(`素材文件未连接：${p.assets.find(a => a.id === id)?.name ?? id}`);
   return issues;
@@ -122,4 +122,52 @@ export function parseProject(raw: string): Project {
   p.assets = d.assets.map(x => { const a = record(x); if (!/^[a-zA-Z0-9_-]{1,100}$/.test(str(a.id)) || !['audio', 'image', 'video'].includes(str(a.kind))) throw new Error('素材格式错误。'); return { id: str(a.id), name: str(a.name), kind: a.kind as MediaAsset['kind'], size: number(a.size, 0), mime: str(a.mime), duration: typeof a.duration === 'number' ? number(a.duration, 0) : undefined }; });
   p.scenes = d.scenes.length ? parseScenePlan(JSON.stringify({ version: 1, projectId: p.id, audioRevision: p.audioRevision, scenes: d.scenes }), p) : [];
   return p;
+}
+
+/** Import a single execution table, retaining audio and local file ownership. */
+export function parseProductionPlan(raw: string, current: Project): Project {
+  const d = record(JSON.parse(raw));
+  if (d.projectId !== current.id || d.audioRevision !== current.audioRevision) throw new Error('总表属于其他项目或旧录音，请用当前制作资料重新生成。');
+  const p: Project = { ...current, assets: [...current.assets] };
+  if (d.sentences !== undefined) {
+    if (!Array.isArray(d.sentences) || !d.sentences.length || d.sentences.length > 5000) throw new Error('总表原文格式错误。');
+    const seen = new Set<string>(); let lastEnd = 0;
+    const duration = current.assets.find(a => a.id === current.audioAssetId)?.duration;
+    p.sentences = d.sentences.map(x => {
+      const s = record(x);
+      if (typeof s.id !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(s.id) || seen.has(s.id) || typeof s.text !== 'string' || !s.text.trim()) throw new Error('原文需要不重复的id和text。');
+      seen.add(s.id);
+      if (s.start !== null || s.end !== null) {
+        if (typeof s.start !== 'number' || typeof s.end !== 'number' || !Number.isFinite(s.start) || !Number.isFinite(s.end) || s.start < lastEnd || s.end <= s.start || (duration && s.end > duration + .05)) throw new Error(`${s.id}时间无效、重叠或超出录音。没有实测时间时，start和end都填null。`);
+        lastEnd = s.end;
+      }
+      return { id: s.id, text: s.text, start: s.start as number | null, end: s.end as number | null };
+    });
+  }
+  if (!p.sentences.length) throw new Error('总表需要原文sentences；也可以先补充稿子再导入旧画面方案。');
+  if (d.assets !== undefined) {
+    if (!Array.isArray(d.assets) || d.assets.length > 500) throw new Error('素材清单格式错误。');
+    const ids = new Set<string>(); const names = new Set<string>();
+    for (const x of d.assets) {
+      const a = record(x); const id = str(a.id), name = str(a.name), kind = str(a.kind);
+      if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id) || !name.trim() || name.includes('/') || name.includes('\\') || !['image','video'].includes(kind) || ids.has(id) || names.has(name) || id === p.audioAssetId) throw new Error('素材清单需要不重复的id、文件名和image/video类型。');
+      ids.add(id); names.add(name);
+      const existing = p.assets.find(a => a.id === id);
+      if (existing && (existing.name !== name || existing.kind !== kind)) throw new Error('素材编号与当前文件不符，请保留原编号。');
+      if (!existing) p.assets.push({ id, name, kind: kind as 'image'|'video', size: 0, mime: '' });
+    }
+  }
+  p.scenes = parseScenePlan(raw, p);
+  const ownership = new Set<string>();
+  for (const sc of p.scenes) {
+    const indices = sc.sentenceIds.map(id => p.sentences.findIndex(s => s.id === id)).sort((a,b)=>a-b);
+    if (indices.some((n,i) => i > 0 && n !== indices[i-1]+1)) throw new Error(`${sc.title}只能覆盖连续原文。`);
+    for (const id of sc.sentenceIds) { if (ownership.has(id)) throw new Error(`${id}重复安排画面。`); ownership.add(id); }
+    if (sc.kind !== 'info' && !p.assets.some(a => a.id === sc.assetId && a.kind === sc.kind)) throw new Error(`${sc.title}的素材必须列在assets中，含真实或待录制的文件名。`);
+  }
+  if (p.sentences.some(s => !ownership.has(s.id))) throw new Error('总表有原文未安排画面，请补齐后导入。');
+  return p;
+}
+export function pendingAsset(p: Project, name: string, size: number, kind: MediaAsset['kind'], connected: Map<string, Blob>) {
+  return p.assets.find(a => a.name === name && (a.size === 0 || a.size === size) && a.kind === kind && !connected.has(a.id));
 }

@@ -1,8 +1,8 @@
-// 功能B：信息动画
+// 功能B：文字图解动画
 // 输入 → AI 分析（先给可编辑方案，确认后才生成）→ 分镜 → 低清预览 → 细节调整 → 云端高清 MP4
 import React, { useMemo, useState } from 'react';
 import type { DirectorOutput, StructureName } from '../../../src/spec/types';
-import { runDirector, DIRECTOR_EXAMPLE } from '../lib/director';
+import { DIRECTOR_EXAMPLE } from '../lib/director';
 import { layoutDirectorOutput } from '../lib/layout';
 import { PreviewPlayer } from '../components/PreviewPlayer';
 import { useCloudRender } from '../lib/useCloudRender';
@@ -20,33 +20,13 @@ const STRUCTURES: { key: StructureName; label: string }[] = [
 
 export const InfoMotion: React.FC = () => {
   const [phase, setPhase] = useState<Phase>('input');
-  const [content, setContent] = useState('');
   const [plan, setPlan] = useState<DirectorOutput | null>(null);
   const [error, setError] = useState('');
   const [manualJson, setManualJson] = useState(JSON.stringify(DIRECTOR_EXAMPLE, null, 2));
-  const [showManual, setShowManual] = useState(false);
+  const showManual = true;
   const cloud = useCloudRender();
 
   const spec = useMemo(() => (plan ? layoutDirectorOutput(plan) : null), [plan]);
-
-  const analyze = async () => {
-    setError('');
-    setPhase('analyzing');
-    try {
-      const d = await runDirector(content);
-      setPlan(d);
-      setPhase('plan');
-    } catch (e) {
-      const err = e as Error;
-      if (err.message === 'NO_KEY') {
-        setError('未配置 AI Key。点右上角「设置」填入，或使用手工 JSON 模式。');
-        setShowManual(true);
-      } else {
-        setError(err.message);
-      }
-      setPhase('input');
-    }
-  };
 
   const applyManual = () => {
     try {
@@ -69,26 +49,13 @@ export const InfoMotion: React.FC = () => {
         <div className="row" style={{ marginBottom: 6 }}>
           <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
         </div>
-        <h2 className="page-title">信息动画</h2>
-        <p className="page-sub">粘贴一段话，AI 先告诉你「它打算怎么表达」，你确认后再生成动画。</p>
+        <h2 className="page-title">文字图解动画</h2>
+        <p className="page-sub">用ChatGPT编排的方案制作对比、流程或重点图解片段。</p>
         <div className="card col" style={{ gap: 12 }}>
-          <textarea
-            rows={8}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="例如：Google 通常是你问一个问题，它给你答案，然后就结束了。而 ChatGPT 的回答可能又让我产生一个新问题，于是继续问，话题会不断延伸。"
-            style={{ width: '100%', resize: 'vertical' }}
-          />
-          {error && <div className="muted" style={{ color: 'var(--danger)' }}>{error}</div>}
-          <div className="row">
-            <button className="primary" disabled={!content.trim() || phase === 'analyzing'} onClick={analyze}>
-              {phase === 'analyzing' ? 'AI 分析中…' : '下一步：AI 分析 →'}
-            </button>
-            <button className="ghost" onClick={() => setShowManual(!showManual)}>手工 JSON 模式</button>
-          </div>
+          <p className="muted">这是单独的图解片段工具。完整视频请进入「视频制作」。下方为可预览示例；把稿子和此格式交给ChatGPT，返回后粘贴替换。Motion不调用付费AI。</p>{error && <p role="alert">{error}</p>}
           {showManual && (
             <div className="col" style={{ gap: 8 }}>
-              <span className="muted">直接粘贴 / 编辑导演方案 JSON（结构：meaning / primaryStructure / steps 等）：</span>
+              <span className="muted">图解方案（JSON内容，下方已填入示例）</span>
               <textarea className="code" rows={12} value={manualJson} onChange={(e) => setManualJson(e.target.value)} style={{ width: '100%' }} />
               <div><button className="blue" onClick={applyManual}>使用此方案 →</button></div>
             </div>
@@ -105,11 +72,11 @@ export const InfoMotion: React.FC = () => {
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
         <div className="row">
           <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
-          <b>信息动画 · 动画方案</b>
+          <b>文字图解动画 · 动画方案</b>
         </div>
         <div className="row">
           <button className="ghost" onClick={() => { setPhase('input'); setPlan(null); }}>← 重新输入</button>
-          <button className="ghost" onClick={() => setPhase('input')}>重新分析</button>
+          <button className="ghost" onClick={() => setPhase('input')}>修改方案</button>
           {phase === 'plan' && <button className="blue" onClick={() => setPhase('preview')}>生成预览 →</button>}
           {phase === 'preview' && (
             <button className="primary"

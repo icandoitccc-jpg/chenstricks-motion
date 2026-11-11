@@ -24,6 +24,17 @@ try {
   assert(m.validateProject({ ...p, scenes: [{ ...p.scenes[0], sentenceIds: ['S001', 'S003'] }] }).some(x => x.message.includes('连续')));
   assert(m.validateProject({ ...p, scenes: p.scenes.map(s => s.id === 'second' ? { ...s, sourceIn: 29 } : s) }).some(x => x.message.includes('长度不足')));
   assert.equal(m.parseProject(JSON.stringify(p)).scenes.length, 3);
+  const total = {version:1,projectId:p.id,audioRevision:p.audioRevision,sentences:p.sentences,assets:[{id:'missing',name:'demo.png',kind:'image'}],scenes:p.scenes.map((sc,i)=>i===0?{...sc,kind:'image',assetId:'missing'}:sc)};
+  const imported=m.parseProductionPlan(JSON.stringify(total),p);
+  assert.equal(imported.sentences.length,3); assert.equal(imported.scenes[0].assetId,'missing');
+  assert(m.validateProject(imported,files).some(x=>x.message.includes('demo.png')));
+  assert.equal(m.pendingAsset(imported,'demo.png',100,'image',files).id,'missing');
+  assert.equal(m.pendingAsset(imported,'demo.png',100,'image',new Map([...files,['missing',new Blob(['x'])]])),undefined);
+  assert.throws(()=>m.parseProductionPlan(JSON.stringify({...total,audioRevision:99}),p));
+  assert.throws(()=>m.parseProductionPlan(JSON.stringify({...total,sentences:total.sentences.map((s,i)=>i===0?{...s,end:99}:s)}),p));
+  assert.throws(()=>m.parseProductionPlan(JSON.stringify({...total,scenes:total.scenes.slice(1)}),p));
+  const untimed=m.parseProductionPlan(JSON.stringify({...total,sentences:total.sentences.map(s=>({...s,start:null,end:null}))}),p);
+  assert(m.validateProject(untimed,files).some(x=>x.message.includes('尚未标记')));
   const html = render.projectHtml(p, { audio: 'blob:voice', clip: 'blob:screen' }, true);
   assert(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
   assert(!html.includes('<script>alert(1)</script>'));

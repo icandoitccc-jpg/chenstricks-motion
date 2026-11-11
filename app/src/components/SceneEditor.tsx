@@ -6,7 +6,7 @@ export function SceneEditor({ project, scene, onChange, onDelete, onDuplicate }:
   return <section className="studio-inspector" aria-label="画面设置">
     <div className="studio-section-heading"><h3>画面设置</h3><button onClick={onDelete}>删除</button></div>
     <label>画面标题<input value={scene.title} onChange={e => onChange({ title: e.target.value })} /></label>
-    <label>画面来源<select value={scene.kind} onChange={e => onChange({ kind: e.target.value as Scene['kind'], assetId: undefined })}><option value="info">信息动画</option><option value="image">图片 / 截图</option><option value="video">录屏 / 视频</option></select></label>
+    <label>画面来源<select value={scene.kind} onChange={e => onChange({ kind: e.target.value as Scene['kind'], assetId: undefined })}><option value="info">文字图解动画</option><option value="image">图片 / 截图</option><option value="video">录屏 / 视频</option></select></label>
     <p className="studio-hint">{timed ? `${formatTime(timed.start)} — ${formatTime(timed.end)} · ${(timed.end - timed.start).toFixed(2)} 秒` : '绑定句子并标记时间后，自动计算此幕时长。'}</p>
     <label>绑定哪些句子<select multiple size={Math.min(6, Math.max(2, project.sentences.length))} value={scene.sentenceIds} onChange={e => onChange({ sentenceIds: Array.from(e.target.selectedOptions, o => o.value) })}>{project.sentences.map(s => <option key={s.id} value={s.id}>{s.id} {s.text.slice(0, 22)}</option>)}</select></label>
     <p className="studio-hint">可按住 Shift 选择连续句子。每句只分配一个画面。</p>

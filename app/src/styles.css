@@ -1,14 +1,14 @@
 :root {
-  --bg: #0F1B16;
-  --panel: rgba(255, 255, 255, 0.05);
-  --panel-strong: rgba(255, 255, 255, 0.09);
-  --stroke: rgba(255, 255, 255, 0.14);
-  --text: #F5F1E8;
-  --muted: rgba(245, 241, 232, 0.55);
+  --bg: #f7f5f0;
+  --panel: #ffffff;
+  --panel-strong: #eaf0f7;
+  --stroke: #ccd2c9;
+  --text: #28312e;
+  --muted: #59645d;
   --accent: #E8A33D;
-  --blue: #5EA8FF;
-  --green: #4ADE80;
-  --danger: #F87171;
+  --blue: #285fae;
+  --green: #237444;
+  --danger: #ad4031;
   --radius: 12px;
 }
 * { box-sizing: border-box; }
@@ -34,7 +34,7 @@ button.blue { background: var(--blue); border-color: var(--blue); color: #0a1524
 button.ghost { background: transparent; }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 input, textarea, select {
-  font-family: inherit; background: rgba(0,0,0,0.3); color: var(--text);
+  font-family: inherit; background: #fff; color: var(--text);
   border: 1px solid var(--stroke); border-radius: 10px; padding: 10px 12px; font-size: 14px;
 }
 input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); }
@@ -135,11 +135,11 @@ input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); }
   }
 }
 .modal-mask > * { max-height: calc(100vh - 48px); overflow-y: auto; }
-.modal { background: #16241e; border: 1px solid var(--stroke); border-radius: 16px; padding: 24px; width: 480px; max-width: 92vw; }
+.modal { background: #fff; border: 1px solid var(--stroke); border-radius: 16px; padding: 24px; width: 480px; max-width: 92vw; }
 .modal h3 { margin-top: 0; }
 /* 生成弹窗：保留半透明 glass 观感，只加一点厚度和投影，让它从背景里浮出来 */
 .glass {
-  background: rgba(20, 34, 28, 0.82);
+  background: #fff;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 18px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
@@ -156,3 +156,5 @@ input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); }
 .export-step.fail .dot { background: var(--danger); border-color: var(--danger); color: #2a0b0b; }
 .export-actions { display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--stroke); padding-top: 14px; margin-top: 4px; }
 textarea.code { font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.5; }
+
+body{margin:0;line-height:1.55}.side-nav{background:#eeece6;width:220px}.side-nav .brand{white-space:nowrap}.nav-group{font-size:11px;letter-spacing:.06em;color:var(--muted);padding:18px 12px 4px}.nav-item{color:#505d55}button:focus-visible,a:focus-visible{outline:2px solid var(--blue);outline-offset:3px}button:disabled{opacity:1;background:#ecebe6;color:#656c66;border-color:#d2d5cd}input::placeholder,textarea::placeholder{color:#687369}.glass .card{background:#f7f5f0}.tag.amber{color:#79510d}.tag.green{color:#237444}.main{padding:28px 32px}.page-sub{line-height:1.7}.home-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}.home-flow div{padding:12px;background:#f1f3ee;border-radius:8px;font-size:13px}.home-flow small{display:block;color:var(--muted);margin-top:6px}@media(max-width:850px){.app-shell{display:block}.side-nav{width:100%;flex-direction:row;flex-wrap:wrap}.side-nav .brand{width:100%}.nav-group{width:100%;padding:6px 12px}.main{padding:20px}.home-flow{grid-template-columns:1fr 1fr}.a-layout{grid-template-columns:1fr}}

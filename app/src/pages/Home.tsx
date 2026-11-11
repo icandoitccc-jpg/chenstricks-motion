@@ -1,34 +1,5 @@
 import React from 'react';
-
-export const Home: React.FC<{ go: (p: string) => void }> = ({ go }) => {
-  return (
-    <div>
-      <h2 className="page-title" style={{ fontSize: 30 }}>让你的想法<br />变成动态画面</h2>
-      <p className="page-sub">简单 · 清晰 · 专注于表达</p>
-      <div className="home-card" style={{ maxWidth: 860, marginBottom: 18 }}>
-        <h3>口播项目</h3>
-        <p>导入自己的旁白和 ChatGPT 画面方案，穿插录屏、截图与信息动画。先预览，再导出。</p>
-        <button className="primary" onClick={() => go('#/studio')}>打开口播项目 →</button>
-      </div>
-      <div className="home-grid">
-        <div className="home-card">
-          <div style={{ fontSize: 34 }}>🖼️</div>
-          <h3>让图片动起来</h3>
-          <p>上传一张完成构图的图片，框选局部区域，让文字、卡片、按钮按顺序独立动起来。</p>
-          <button className="primary" onClick={() => go('#/a')}>开始创作 →</button>
-        </div>
-        <div className="home-card">
-          <div style={{ fontSize: 34 }}>💡</div>
-          <h3>信息动画</h3>
-          <p>粘贴一段话，AI 先告诉你它打算怎么表达，确认后自动生成有逻辑、有节奏的动画。</p>
-          <button className="primary" onClick={() => go('#/b')}>开始创作 →</button>
-        </div>
-      </div>
-      <div className="row" style={{ marginTop: 28, gap: 22 }}>
-        <span className="tag">☁️ 云端渲染 · GitHub Actions</span>
-        <span className="tag amber">🎬 1080p · Q4 高画质</span>
-        <span className="tag green">✨ 素材即用即删</span>
-      </div>
-    </div>
-  );
-};
+export const Home: React.FC<{go:(p:string)=>void}> = ({go}) => <div style={{maxWidth:1050}}>
+<h1 className="page-title" style={{fontSize:30}}>用你的录音，组织一条视频</h1><p className="page-sub">ChatGPT安排画面，Motion按制作总表播放录屏、图片和文字图解。</p>
+<section className="home-card"><h3>视频制作</h3><p>完整视频的工作区：以最终录音为时间基准，导入包含原文、实际时间和画面指令的总表。</p><div className="home-flow"><div>1 · 导入录音<small>读取真实音频时长</small></div><div>2 · 导入制作总表<small>每段原文、时间和画面</small></div><div>3 · 准备画面<small>连接需要的截图和录屏</small></div><div>4 · 预览与导出<small>核对同步，保存项目</small></div></div><button className="primary" onClick={()=>go('#/studio')}>进入视频制作 →</button><p style={{marginTop:14}}>目前可编辑、预览和保存；Workspace／WORKPRINT自动取素材尚未接通，云端MP4与20分钟成片尚未验收。</p></section>
+<h2 style={{fontSize:18,marginTop:28}}>画面片段工具</h2><p className="page-sub">单独制作一段画面。与上方完整视频工作区分开，导出的片段需手动添加到视频。</p><div className="home-grid"><section className="home-card"><h3>图片局部动画</h3><p>框选图片中的文字、卡片或按钮，设置局部出现、移动或强调动画。</p><button onClick={()=>go('#/a')}>制作图片动画 →</button></section><section className="home-card"><h3>文字图解动画</h3><p>把内容排成对比、流程或重点图解，按方案播放动画。Motion内不调用付费AI。</p><button onClick={()=>go('#/b')}>制作文字图解 →</button></section></div></div>;

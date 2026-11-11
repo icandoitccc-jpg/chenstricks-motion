@@ -1,4 +1,4 @@
-// 功能A：让图片动起来
+// 功能A：图片局部动画
 // 上传 → 框选 → 动作序列（每个区域一串动画）→ 实时预览 → 云端生成 MP4
 // V2 数据模型：Region = 动作序列（多 Action）。引擎层不变。
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -266,7 +266,7 @@ export const ImageMotion: React.FC = () => {
         <div className="row" style={{ marginBottom: 6 }}>
           <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
         </div>
-        <h2 className="page-title">让图片动起来</h2>
+        <h2 className="page-title">图片局部动画</h2>
         <p className="page-sub">上传一张已经完成构图的图片，框选局部区域，让它们按顺序动起来。</p>
         <div className="card" style={{ maxWidth: 560, textAlign: 'center', padding: 40 }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🖼️</div>
@@ -311,7 +311,7 @@ export const ImageMotion: React.FC = () => {
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
         <div className="row">
           <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
-          <b>让图片动起来</b>
+          <b>图片局部动画</b>
           <button className="ghost" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => { setImage(null); setItems([]); }}>换图片</button>
           {lowRes && <span className="tag" style={{ fontSize: 12 }}>源图分辨率较低，最终导出可能不够清晰</span>}
         </div>
