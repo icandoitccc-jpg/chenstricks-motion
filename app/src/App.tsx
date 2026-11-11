@@ -3,6 +3,7 @@ import { Home } from './pages/Home';
 import { ImageMotion } from './pages/ImageMotion';
 import { InfoMotion } from './pages/InfoMotion';
 import { SettingsModal } from './components/SettingsModal';
+import { Studio } from './pages/Studio';
 
 function useHashRoute(): [string, (p: string) => void] {
   const [hash, setHash] = useState(window.location.hash || '#/');
@@ -19,13 +20,14 @@ export const App: React.FC = () => {
   const [hash, go] = useHashRoute();
   const [showSettings, setShowSettings] = useState(false);
 
-  const page = hash.startsWith('#/a') ? 'a' : hash.startsWith('#/b') ? 'b' : 'home';
+  const page = hash.startsWith('#/studio') ? 'studio' : hash.startsWith('#/a') ? 'a' : hash.startsWith('#/b') ? 'b' : 'home';
 
   return (
     <div className="app-shell">
       <nav className="side-nav">
         <div className="brand">chenstricks <span>Motion</span></div>
         <a className={`nav-item ${page === 'home' ? 'active' : ''}`} href="#/">🏠 首页</a>
+        <a className={`nav-item ${page === 'studio' ? 'active' : ''}`} href="#/studio">口播项目</a>
         <a className={`nav-item ${page === 'a' ? 'active' : ''}`} href="#/a">🖼️ 让图片动起来</a>
         <a className={`nav-item ${page === 'b' ? 'active' : ''}`} href="#/b">💡 信息动画</a>
         <div style={{ flex: 1 }} />
@@ -33,10 +35,11 @@ export const App: React.FC = () => {
       </nav>
       <main className="main">
         {page === 'home' && <Home go={go} />}
+        {page === 'studio' && <Studio />}
         {page === 'a' && <ImageMotion />}
         {page === 'b' && <InfoMotion />}
       </main>
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showSettings && <SettingsModal githubOnly={page === 'studio'} onClose={() => setShowSettings(false)} />}
     </div>
   );
 };

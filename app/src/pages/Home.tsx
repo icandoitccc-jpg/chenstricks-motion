@@ -5,6 +5,11 @@ export const Home: React.FC<{ go: (p: string) => void }> = ({ go }) => {
     <div>
       <h2 className="page-title" style={{ fontSize: 30 }}>让你的想法<br />变成动态画面</h2>
       <p className="page-sub">简单 · 清晰 · 专注于表达</p>
+      <div className="home-card" style={{ maxWidth: 860, marginBottom: 18 }}>
+        <h3>口播项目</h3>
+        <p>导入自己的旁白和 ChatGPT 画面方案，穿插录屏、截图与信息动画。先预览，再导出。</p>
+        <button className="primary" onClick={() => go('#/studio')}>打开口播项目 →</button>
+      </div>
       <div className="home-grid">
         <div className="home-card">
           <div style={{ fontSize: 34 }}>🖼️</div>

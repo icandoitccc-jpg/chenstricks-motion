@@ -4,6 +4,8 @@
   "private": true,
   "description": "chenstricks Motion — 让已完成的图片局部动起来 / 把一段信息变成信息动画，输出可直接导入剪映的短视频 MP4",
   "scripts": {
+    "test:project": "node scripts/test-project.mjs",
+    "build:studio-preview": "node scripts/build-studio-preview.mjs",
     "typecheck": "tsc --noEmit",
     "bundle": "remotion bundle src/index.ts out/bundle",
     "render": "node scripts/render.mjs",

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { getPat, setPat, verifyPat } from '../lib/github';
 import { getLlmConfig, setLlmConfig } from '../lib/director';
 
-export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+export const SettingsModal: React.FC<{ onClose: () => void; githubOnly?: boolean }> = ({ onClose, githubOnly = false }) => {
   const [pat, setPatV] = useState(getPat());
   const llm = getLlmConfig();
   const [apiKey, setApiKey] = useState(llm.apiKey);
@@ -14,7 +14,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
   const save = async () => {
     setPatV(pat.trim());
     setPat(pat);
-    setLlmConfig(apiKey, baseUrl, model);
+    if (!githubOnly) setLlmConfig(apiKey, baseUrl, model);
     if (pat.trim()) {
       try {
         const login = await verifyPat();
@@ -37,7 +37,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             <span className="muted">需要 classic token，勾选 <code>repo</code> + <code>workflow</code>。只存在本机浏览器，用于触发渲染和下载 MP4。</span>
             <input type="password" value={pat} onChange={(e) => setPatV(e.target.value)} placeholder="ghp_..." />
           </div>
-          <div className="col">
+          {!githubOnly && <div className="col">
             <b>AI 分析 Key（功能B 可选）</b>
             <span className="muted">OpenAI 兼容接口。不配置时功能B 可用手工 JSON 模式。</span>
             <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-..." />
@@ -45,7 +45,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
               <input style={{ flex: 2 }} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" />
               <input style={{ flex: 1 }} value={model} onChange={(e) => setModel(e.target.value)} placeholder="gpt-4o-mini" />
             </div>
-          </div>
+          </div>}
           {msg && <div className="muted">{msg}</div>}
           <div className="row" style={{ justifyContent: 'flex-end' }}>
             <button onClick={onClose}>关闭</button>

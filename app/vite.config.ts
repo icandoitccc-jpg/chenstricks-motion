@@ -6,7 +6,7 @@ import path from 'node:path';
 // 与 app 自身的依赖形成两份实例（Player 上下文断裂、hooks 报错）。
 // 统一强制解析到 app/node_modules，保证全图只有一份 remotion/react。
 export default defineConfig({
-  base: '/chenstricks-motion/',
+  base: './',
   plugins: [react()],
   resolve: {
     dedupe: ['react', 'react-dom', 'remotion', '@remotion/player'],
