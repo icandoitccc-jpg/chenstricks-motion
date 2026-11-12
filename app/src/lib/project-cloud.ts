@@ -10,7 +10,7 @@ permissions:
   contents: read
 jobs:
   render:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +23,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg fonts-noto-cjk
-          npm install --no-audit --no-fund @hyperframes/cli@0.9.33 gsap@3.13.0
+          npm install --no-audit --no-fund hyperframes@0.9.33 gsap@3.13.0
       - name: Prepare project
         run: |
           mkdir -p render/lib render/assets/fonts

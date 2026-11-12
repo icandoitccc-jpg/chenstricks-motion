@@ -31,7 +31,7 @@ export async function projectZip(p: Project, files: Map<string, Blob>, render = 
   const zip = new JSZip(); zip.file('project.json', JSON.stringify(p, null, 2));
   const urls: Record<string,string> = {};
   for (const a of p.assets) { const f = files.get(a.id); if (f) { const path = assetPath(a.id, a.name); zip.file(path, f); urls[a.id] = path; } }
-  if (render) { zip.file('index.html', projectHtml(p, urls)); zip.file('README.txt', '这是 Motion 的 HyperFrames 渲染包。音视频与稿件保留在此包中，请勿放入公开仓库。云端须安装 @hyperframes/cli@0.9.33、gsap@3.13.0，拷贝 gsap.min.js 到 lib/，并提供 assets/fonts/NotoSansSC.ttf 后执行 hyperframes render。'); }
+  if (render) { zip.file('index.html', projectHtml(p, urls)); zip.file('README.txt', '这是 Motion 的 HyperFrames 渲染包。音视频与稿件保留在此包中，请勿放入公开仓库。云端须安装 hyperframes@0.9.33、gsap@3.13.0，拷贝 gsap.min.js 到 lib/，并提供 assets/fonts/NotoSansSC.ttf 后执行 hyperframes render。'); }
   return zip.generateAsync({ type: 'blob', compression: 'STORE' });
 }
 export async function readProjectZip(file: File): Promise<StoredProject> {
