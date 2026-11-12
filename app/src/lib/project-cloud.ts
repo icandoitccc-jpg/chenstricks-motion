@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { getPat, saveBlob } from './github';
+import { getPat } from './github';
 
 // User media are only sent to a verified PRIVATE repository, never the public site repository.
 const workflow = `name: Motion project render
@@ -42,6 +42,18 @@ jobs:
                   if total > 120 * 1024 * 1024:
                       raise SystemExit('Archive too large')
               z.extractall('render')
+          range_file = pathlib.Path('render/audio-range.json')
+          if range_file.exists():
+              import json, math, subprocess
+              r = json.loads(range_file.read_text())
+              root = pathlib.Path('render').resolve()
+              source = (root / r['source']).resolve()
+              if not source.is_relative_to(root) or not source.is_file():
+                  raise SystemExit('Invalid audio range source')
+              start, duration = float(r['start']), float(r['duration'])
+              if not math.isfinite(start) or not math.isfinite(duration) or start < 0 or duration <= 0:
+                  raise SystemExit('Invalid audio range')
+              subprocess.run(['ffmpeg', '-v', 'error', '-i', str(source), '-ss', str(start), '-t', str(duration), '-vn', '-c:a', 'pcm_s16le', '-y', str(root / 'assets/segment-audio.wav')], check=True)
           PY
           cp node_modules/gsap/dist/gsap.min.js render/lib/
           curl --fail --location --retry 2 --max-time 90 -o render/assets/fonts/NotoSansSC.ttf 'https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf'
@@ -68,7 +80,7 @@ async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> 
 const b64 = (text: string) => { const bytes = new TextEncoder().encode(text); let s = ''; for (const byte of bytes) s += String.fromCharCode(byte); return btoa(s); };
 const asBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.onerror = () => reject(new Error('读取渲染包失败。')); r.readAsDataURL(blob); });
 
-export async function renderProjectCloud(zip: Blob, repoName: string, onProgress: (s: string) => void, signal: AbortSignal): Promise<string> {
+export async function renderProjectCloud(zip: Blob, repoName: string, onProgress: (s: string) => void, signal: AbortSignal): Promise<{ blob: Blob; runUrl: string }> {
   if (!/^[a-zA-Z0-9_-]{1,80}$/.test(repoName)) throw new Error('请填写单独的私有渲染仓库名。');
   if (zip.size > 80 * 1024 ** 2) throw new Error('云端首版渲染包限80MB，请减少未使用素材。');
   onProgress('检查私有仓库…'); const user = await api<{ login: string }>('/user'); const repo = `/repos/${user.login}/${repoName}`;
@@ -106,11 +118,11 @@ export async function renderProjectCloud(zip: Blob, repoName: string, onProgress
       if (run.conclusion !== 'success') throw new Error(`云端任务未成功（${run.conclusion}），查看：${run.html_url}`);
       const data = await api<{ artifacts: { id: number; name: string; expired: boolean }[] }>(`${repo}/actions/runs/${run.id}/artifacts`); const art = data.artifacts.find(a => a.name === 'motion-video' && !a.expired);
       if (!art) throw new Error(`任务结束但未找到 MP4：${run.html_url}`);
-      onProgress('下载 MP4…');
+      onProgress('读取成片用于页面播放，不自动下载…');
       const r = await fetch(`https://api.github.com${repo}/actions/artifacts/${art.id}/zip`, { headers: { Authorization: `Bearer ${getPat()}`, Accept: 'application/vnd.github+json' } });
       if (!r.ok) throw new Error(`浏览器未能下载产物，请从任务页面下载：${run.html_url}`);
       const z = await JSZip.loadAsync(await r.arrayBuffer()); const f = Object.values(z.files).find(f => f.name.endsWith('.mp4'));
-      if (!f) throw new Error('产物中缺少 MP4。'); saveBlob(await f.async('blob'), 'motion.mp4'); return run.html_url;
+      if (!f) throw new Error('产物中缺少 MP4。'); const blob = await f.async('blob'); return { blob: blob.slice(0, blob.size, 'video/mp4'), runUrl: run.html_url };
     }
     await new Promise<void>((resolve) => { const done = () => { clearTimeout(id); signal.removeEventListener('abort', done); resolve(); }; const id = setTimeout(done, 10000); signal.addEventListener('abort', done, { once: true }); });
   }
