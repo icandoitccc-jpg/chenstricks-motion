@@ -47,12 +47,12 @@ export const InfoMotion: React.FC = () => {
     return (
       <div style={{ maxWidth: 720 }}>
         <div className="row" style={{ marginBottom: 6 }}>
-          <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
+          <a className="ghost" href="#/tools" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回素材工具</a>
         </div>
         <h2 className="page-title">文字图解动画</h2>
         <p className="page-sub">用ChatGPT编排的方案制作对比、流程或重点图解片段。</p>
         <div className="card col" style={{ gap: 12 }}>
-          <p className="muted">这是单独的图解片段工具。完整视频请进入「视频制作」。下方为可预览示例；把稿子和此格式交给ChatGPT，返回后粘贴替换。Motion不调用付费AI。</p>{error && <p role="alert">{error}</p>}
+          {error && <p role="alert">{error}</p>}
           {showManual && (
             <div className="col" style={{ gap: 8 }}>
               <span className="muted">图解方案（JSON内容，下方已填入示例）</span>
@@ -71,7 +71,7 @@ export const InfoMotion: React.FC = () => {
     <div>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
         <div className="row">
-          <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
+          <a className="ghost" href="#/tools" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回素材工具</a>
           <b>文字图解动画 · 动画方案</b>
         </div>
         <div className="row">

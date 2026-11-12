@@ -23,7 +23,13 @@ async function db() {
 function done(t: IDBTransaction) {
   return new Promise<void>((resolve, reject) => { t.oncomplete = () => resolve(); t.onabort = t.onerror = () => reject(new Error('保存失败：空间不足或浏览器拒绝存储。')); });
 }
-export async function saveProject(project: Project, files: Map<string, Blob>, cacheMedia = false) {
+let pendingWrite: Promise<void> = Promise.resolve();
+export function saveProject(project: Project, files: Map<string, Blob>, cacheMedia = false): Promise<void> {
+  const snapshot = structuredClone(project); const media = new Map(files);
+  const task = pendingWrite.catch(()=>{}).then(()=>persistProject(snapshot, media, cacheMedia));
+  pendingWrite = task; return task;
+}
+async function persistProject(project: Project, files: Map<string, Blob>, cacheMedia = false) {
   const d = await db(); try {
     const t = d.transaction(['catalog', 'project-media'], 'readwrite');
     t.objectStore('catalog').put({ project, updatedAt: Date.now(), cacheMedia }, project.id);
@@ -37,12 +43,14 @@ export async function saveProject(project: Project, files: Map<string, Blob>, ca
   } finally { d.close(); }
 }
 export async function listProjects(): Promise<ProjectEntry[]> {
+  await pendingWrite.catch(()=>{});
   const d = await db(); try {
     const t = d.transaction('catalog'); const r = t.objectStore('catalog').getAll(); await done(t);
     return r.result.sort((a: ProjectEntry, b: ProjectEntry) => b.updatedAt - a.updatedAt);
   } finally { d.close(); }
 }
 export async function deleteProject(id: string) {
+  await pendingWrite.catch(()=>{});
   const d = await db(); try {
     const t = d.transaction(['catalog', 'project-media'], 'readwrite'); t.objectStore('catalog').delete(id); savedFiles.delete(id);
     const media = t.objectStore('project-media'); const keys = media.getAllKeys();
@@ -51,6 +59,7 @@ export async function deleteProject(id: string) {
   } finally { d.close(); }
 }
 export async function loadProject(id?: string): Promise<(StoredProject & { cacheMedia?: boolean }) | undefined> {
+  await pendingWrite.catch(()=>{});
   const d = await db(); let legacy: StoredProject | undefined;
   try {
     const t = d.transaction('catalog');
@@ -112,9 +121,10 @@ export function planningPacket(p: Project) {
 这是给ChatGPT的输入。请返回一份可直接导入的视频制作总表JSON，不要另造格式。
 projectId: ${p.id}
 audioRevision: ${p.audioRevision}
+scriptRevision: ${p.scriptRevision ?? 0}
 录音时长（秒）: ${p.assets.find(a=>a.id===p.audioAssetId)?.duration ?? '未导入'}
-请保留projectId/audioRevision。用户若未提供最终稿，请先索取稿子；此资料不包含录音文件。只有听过录音或已有真实时间字幕，才填写时间，否则start/end都用null，明确要求补充实测时间，严禁根据字数估算。
-总表结构：{version:1,projectId,audioRevision,sentences:[{id,text,start,end}],assets:[{id,name,kind}],scenes:[{id,title,sentenceIds,kind,template,items,assetId,sourceIn,motion,focusX,focusY,leftLabel,rightLabel}]}
+请保留projectId/audioRevision/scriptRevision。用户若未提供最终稿，请先索取稿子；此资料不包含录音文件。只有听过录音或已有真实时间字幕，才填写时间，否则start/end都用null，明确要求补充实测时间，严禁根据字数估算。
+总表结构：{version:1,projectId,audioRevision,scriptRevision,sentences:[{id,text,start,end}],assets:[{id,name,kind}],scenes:[{id,title,sentenceIds,kind,template,items,assetId,sourceIn,motion,focusX,focusY,leftLabel,rightLabel}]}
 sentences每句唯一id、原文text、实际秒数start/end或都null。每句必须且只能安排一个画面，每个画面绑定一组连续句子。保留已有ID和实测时间。
 scenes.kind只允许info/image/video；info模板仅focus/steps/comparison/list，comparison必须恰好两项items，每幕不超过6项。图片动效仅still/push/pan（整图轻推/平移，不是图片局部动画工具）。sourceIn是录屏原文件入点秒数，场景长度由句子时间决定。
 assets只列图片/录屏，kind仅image/video，id与name必须唯一，name是不带路径的文件名。已有素材保持ID；待录屏可指定待补文件名和新ID。image/video画面的assetId必须出现在清单中。缺文件明确列待补，不能声称已自动获取。图像内容没看到时不能声称已选到合适画面。

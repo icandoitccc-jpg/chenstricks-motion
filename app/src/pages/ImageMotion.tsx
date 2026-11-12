@@ -264,7 +264,7 @@ export const ImageMotion: React.FC = () => {
     return (
       <div>
         <div className="row" style={{ marginBottom: 6 }}>
-          <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
+          <a className="ghost" href="#/tools" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回素材工具</a>
         </div>
         <h2 className="page-title">图片局部动画</h2>
         <p className="page-sub">上传一张已经完成构图的图片，框选局部区域，让它们按顺序动起来。</p>
@@ -310,7 +310,7 @@ export const ImageMotion: React.FC = () => {
     <div>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
         <div className="row">
-          <a className="ghost" href="#/" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回首页</a>
+          <a className="ghost" href="#/tools" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回素材工具</a>
           <b>图片局部动画</b>
           <button className="ghost" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => { setImage(null); setItems([]); }}>换图片</button>
           {lowRes && <span className="tag" style={{ fontSize: 12 }}>源图分辨率较低，最终导出可能不够清晰</span>}

@@ -1,0 +1,58 @@
+name: Build and check Motion site
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/build-site.yml', '.github/workflows/project-ui.cjs']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install and build
+        working-directory: app
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          ln -s app/node_modules ../node_modules
+          npm run test:workflow
+          npm run build
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium
+      - name: Check the built application
+        env:
+          QA_MODULES: ${{ github.workspace }}/app/node_modules
+        run: |
+          mkdir -p /tmp/qa-evidence
+          cd app
+          npm run preview -- --host 127.0.0.1 --port 4187 --strictPort >/tmp/vite.log 2>&1 &
+          MOTION_PREVIEW_PID=$!
+          trap 'kill $MOTION_PREVIEW_PID || true' EXIT
+          cd ..
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4187/ >/dev/null && break || sleep 1; done
+          node .github/workflows/project-ui.cjs
+      - name: Stage verified site on publishing branch
+        run: |
+          git worktree add /tmp/motion-site origin/gh-pages
+          rsync -a --delete --exclude=.git --exclude=uploads/ app/dist/ /tmp/motion-site/
+          touch /tmp/motion-site/.nojekyll
+          git -C /tmp/motion-site config user.name 'github-actions[bot]'
+          git -C /tmp/motion-site config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C /tmp/motion-site add -A
+          if ! git -C /tmp/motion-site diff --cached --quiet; then
+            git -C /tmp/motion-site commit -m 'deploy: verified project-first workflow'
+            git -C /tmp/motion-site push origin HEAD:gh-pages
+          fi
+          git -C /tmp/motion-site rev-parse HEAD > /tmp/qa-evidence/site-commit.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: motion-project-qa
+          path: /tmp/qa-evidence
+          retention-days: 1

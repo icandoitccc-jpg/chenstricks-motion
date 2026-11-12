@@ -8,6 +8,8 @@ export interface Scene {
   sourceIn: number; motion: 'still' | 'push' | 'pan'; focusX: number; focusY: number;
 }
 export interface Project {
+  scriptText?: string; draftText?: string; scriptFileName?: string; scriptRevision?: number; planScriptRevision?: number;
+  currentStep?: 'draft' | 'plan' | 'audio' | 'scenes' | 'export';
   version: 1; id: string; title: string; audioRevision: number; audioAssetId?: string;
   width: number; height: number; fps: number; captions: boolean;
   sentences: Sentence[]; scenes: Scene[]; assets: MediaAsset[];
@@ -50,6 +52,7 @@ export function validateProject(p: Project, files?: Map<string, Blob>): Issue[] 
   const issues: Issue[] = []; const error = (message: string) => issues.push({ level: 'error', message });
   const warning = (message: string) => issues.push({ level: 'warning', message });
   const audio = p.assets.find(a => a.id === p.audioAssetId);
+  if (p.scriptText !== undefined && (p.draftText !== p.scriptText || p.planScriptRevision !== p.scriptRevision)) error('终稿或画面安排已变化，请先确认当前版本。');
   if (!audio) error('请导入最终录音。');
   if (!p.sentences.length) error('请导入稿子或时间字幕。');
   const seen = new Set<string>(); let lastEnd = 0;
@@ -120,6 +123,9 @@ export function parseProject(raw: string): Project {
   p.width = Number(d.width); p.height = Number(d.height); p.captions = d.captions !== false;
   p.sentences = d.sentences.map(x => { const s = record(x); if (typeof s.id !== 'string' || typeof s.text !== 'string') throw new Error('句子格式错误。'); return { id: s.id, text: s.text, start: typeof s.start === 'number' ? number(s.start, -1) : null, end: typeof s.end === 'number' ? number(s.end, -1) : null }; });
   p.assets = d.assets.map(x => { const a = record(x); if (!/^[a-zA-Z0-9_-]{1,100}$/.test(str(a.id)) || !['audio', 'image', 'video'].includes(str(a.kind))) throw new Error('素材格式错误。'); return { id: str(a.id), name: str(a.name), kind: a.kind as MediaAsset['kind'], size: number(a.size, 0), mime: str(a.mime), duration: typeof a.duration === 'number' ? number(a.duration, 0) : undefined }; });
+  p.scriptText = typeof d.scriptText === 'string' ? d.scriptText : undefined; p.draftText = typeof d.draftText === 'string' ? d.draftText : p.scriptText;
+  p.scriptFileName = str(d.scriptFileName) || undefined; p.scriptRevision = typeof d.scriptRevision === 'number' ? number(d.scriptRevision, 0) : undefined; p.planScriptRevision = typeof d.planScriptRevision === 'number' ? number(d.planScriptRevision, 0) : undefined;
+  p.currentStep = ['draft','plan','audio','scenes','export'].includes(str(d.currentStep)) ? d.currentStep as Project['currentStep'] : undefined;
   p.scenes = d.scenes.length ? parseScenePlan(JSON.stringify({ version: 1, projectId: p.id, audioRevision: p.audioRevision, scenes: d.scenes }), p) : [];
   return p;
 }
@@ -128,6 +134,7 @@ export function parseProject(raw: string): Project {
 export function parseProductionPlan(raw: string, current: Project): Project {
   const d = record(JSON.parse(raw));
   if (d.projectId !== current.id || d.audioRevision !== current.audioRevision) throw new Error('总表属于其他项目或旧录音，请用当前制作资料重新生成。');
+  if (current.scriptText && d.scriptRevision !== current.scriptRevision) throw new Error('总表对应的终稿已变化，请使用当前稿件重新生成。');
   const p: Project = { ...current, assets: [...current.assets] };
   if (d.sentences !== undefined) {
     if (!Array.isArray(d.sentences) || !d.sentences.length || d.sentences.length > 5000) throw new Error('总表原文格式错误。');
@@ -166,6 +173,11 @@ export function parseProductionPlan(raw: string, current: Project): Project {
     if (sc.kind !== 'info' && !p.assets.some(a => a.id === sc.assetId && a.kind === sc.kind)) throw new Error(`${sc.title}的素材必须列在assets中，含真实或待录制的文件名。`);
   }
   if (p.sentences.some(s => !ownership.has(s.id))) throw new Error('总表有原文未安排画面，请补齐后导入。');
+  if (current.scriptText) {
+    const norm = (s: string) => s.replace(/\s/g, '');
+    if (norm(p.sentences.map(s=>s.text).join('')) !== norm(current.scriptText)) throw new Error('总表原文与项目终稿不一致，未覆盖稿件。');
+    p.planScriptRevision = p.scriptRevision;
+  }
   return p;
 }
 export function pendingAsset(p: Project, name: string, size: number, kind: MediaAsset['kind'], connected: Map<string, Blob>) {
