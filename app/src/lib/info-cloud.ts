@@ -31,6 +31,8 @@ jobs:
       - name: Install renderer
         working-directory: renderer
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
           npm ci --ignore-scripts --no-audit --no-fund
           npx remotion browser ensure
       - name: Render MP4 (no AI calls)
