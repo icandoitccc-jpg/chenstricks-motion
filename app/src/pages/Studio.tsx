@@ -62,6 +62,7 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
   const errors = issues.filter(i => i.level === 'error');
   const audioMeta = project.assets.find(a => a.id === project.audioAssetId); const duration = audioMeta?.duration ?? Math.max(0, ...timed.map(s => s.end));
   const scene = project.scenes.find(s => s.id === selected);
+  useEffect(() => { frame.current?.contentWindow?.postMessage({type:'motion-media',files:[...files].filter(([id])=>project.assets.some(a=>a.id===id&&a.kind!=='audio'))},'*'); }, [files, project.assets, html, tab]);
   const notifyFrame = useCallback((t: number, isPlaying: boolean) => frame.current?.contentWindow?.postMessage({ type: 'motion-preview', time: t, playing: isPlaying }, '*'), []);
   useEffect(() => { notifyFrame(time, playing); }, [time, playing, html, notifyFrame]);
   useEffect(() => { if (!playing) return; let id = 0, previous = 0; const tick = (now: number) => { if (now - previous > 100) { notifyFrame(audio.current?.currentTime ?? 0, true); previous = now; } id = requestAnimationFrame(tick); }; id = requestAnimationFrame(tick); return () => cancelAnimationFrame(id); }, [playing, notifyFrame]);
