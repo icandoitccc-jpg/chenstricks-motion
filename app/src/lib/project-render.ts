@@ -16,8 +16,8 @@ export function projectHtml(p: Project, urls: Record<string, string>, preview = 
   const media = (id?: string) => esc(id ? urls[id] ?? '' : '');
   const sceneHtml = scenes.map((sc, i) => {
     const attrs = `id="${esc(sc.id)}" class="clip scene" data-start="${sc.start}" data-duration="${sc.end - sc.start}" data-track-index="1" style="z-index:${i + 1}"`;
-    if (sc.kind === 'video') return `<video ${attrs} src="${media(sc.assetId)}" data-media-start="${sc.sourceIn}" muted playsinline preload="metadata"></video>`;
-    if (sc.kind === 'image') return `<div ${attrs}><img class="picture" src="${media(sc.assetId)}" alt="${esc(sc.title)}" /></div>`;
+    if (sc.kind === 'video') return `<video ${attrs} ${preview ? `data-asset-id="${esc(sc.assetId??'')}"` : `src="${media(sc.assetId)}"`} data-media-start="${sc.sourceIn}" muted playsinline preload="metadata"></video>`;
+    if (sc.kind === 'image') return `<div ${attrs}><img class="picture" ${preview ? `data-asset-id="${esc(sc.assetId??'')}"` : `src="${media(sc.assetId)}"`} alt="${esc(sc.title)}" /></div>`;
     return `<div ${attrs} data-track-kind="graphics">${graphics(sc)}</div>`;
   }).join('\n');
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(p.title)}</title>
@@ -36,7 +36,8 @@ ${!preview && audio ? `<audio id="narration" class="clip" src="${media(audio.id)
 ${preview ? '' : '<script src="lib/gsap.min.js"></script>'}
 <script>
 const scenes=${json(scenes)},sentences=${json(p.sentences)},isPreview=${preview};
-function draw(t,playing){
+let lastTime=0,lastPlaying=false;
+function draw(t,playing){lastTime=t;lastPlaying=playing;
  const active=scenes.find(s=>t>=s.start&&t<s.end)||scenes.filter(s=>s.start<=t).at(-1);
  for(const sc of scenes){const el=document.getElementById(sc.id);if(!el)continue;const on=!!active&&active.id===sc.id;el.style.visibility=on?'visible':'hidden';
   if(sc.kind==='video'&&isPreview){const desired=Math.min(Number.isFinite(el.duration)?Math.max(0,el.duration-.04):1e9,sc.sourceIn+Math.max(0,t-sc.start));if(on&&el.readyState>=1&&Math.abs(el.currentTime-desired)>.25)el.currentTime=desired;if(on&&playing)el.play().catch(()=>{});else el.pause();}
@@ -47,7 +48,7 @@ function draw(t,playing){
  }
  document.querySelectorAll('.caption').forEach((el,i)=>{const s=sentences.filter(s=>s.start!==null&&s.end!==null)[i];el.style.visibility=s&&t>=s.start&&t<s.end?'visible':'hidden';});
 }
-${preview ? `function fit(){const root=document.getElementById('main');root.style.transform='scale('+Math.min(innerWidth/${p.width},innerHeight/${p.height})+')';}new ResizeObserver(fit).observe(document.body);fit();window.addEventListener('message',e=>{if(e.source===parent&&e.data?.type==='motion-preview')draw(e.data.time,e.data.playing);});` : `const tl=gsap.timeline({paused:true,onUpdate:()=>draw(tl.time(),false)});tl.to({}, {duration:${duration}});window.__timelines=window.__timelines||{};window.__timelines.main=tl;window.addEventListener('hf-seek',e=>draw(e.detail.time,false));`}
+${preview ? `function fit(){const root=document.getElementById('main');root.style.transform='scale('+Math.min(innerWidth/${p.width},innerHeight/${p.height})+')';}new ResizeObserver(fit).observe(document.body);fit();const objectURLs=[];window.addEventListener('message',e=>{if(e.source!==parent)return;if(e.data?.type==='motion-media'){for(const url of objectURLs)URL.revokeObjectURL(url);objectURLs.length=0;const files=new Map(e.data.files);document.querySelectorAll('[data-asset-id]').forEach(el=>{const blob=files.get(el.dataset.assetId);if(blob instanceof Blob){const url=URL.createObjectURL(blob);objectURLs.push(url);el.onloadedmetadata=()=>draw(lastTime,lastPlaying);el.src=url;}});}if(e.data?.type==='motion-preview')draw(e.data.time,e.data.playing);});window.addEventListener('unload',()=>objectURLs.forEach(url=>URL.revokeObjectURL(url)));` : `const tl=gsap.timeline({paused:true,onUpdate:()=>draw(tl.time(),false)});tl.to({}, {duration:${duration}});window.__timelines=window.__timelines||{};window.__timelines.main=tl;window.addEventListener('hf-seek',e=>draw(e.detail.time,false));`}
 draw(0,false);
 </script></body></html>`;
 }

@@ -74,7 +74,7 @@ export const InfoMotion: React.FC = () => {
           {phase === 'preview' && (
             <button className="primary"
               disabled={['uploading','waiting','dispatching','downloading'].includes(cloud.phase) || !spec}
-              onClick={() => spec && cloud.run({ spec, autoDownload:false, compatible:true, fileName: `motion-b-${Date.now()}.mp4` })}>
+              onClick={() => spec && cloud.run({ spec, autoDownload:false, compatible:true, privateInfo:true, fileName: `motion-b-${Date.now()}.mp4` })}>
               生成高清 MP4
             </button>
           )}

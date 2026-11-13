@@ -14,5 +14,10 @@ try{
  assert.throws(()=>parseInfoPlan('{'));assert.throws(()=>parseInfoPlan('x'.repeat(64001)));
  const spec=layoutDirectorOutput(validateInfoPlan({primaryStructure:'Focus',title:'图解导出测试',items:['程序排版','程序动画'],conclusion:'输出完成'}));
  if(process.env.MOTION_INFO_JOB_OUT)await writeFile(process.env.MOTION_INFO_JOB_OUT,JSON.stringify({composition:'Spec',description:'8-second information animation check; no AI calls',concurrency:1,stills:[0,120,239],encode:{crf:8,imageFormat:'png',x264Preset:'slow',pixelFormat:'yuv420p'},spec}));
+ await build({entryPoints:['src/lib/info-cloud.ts'],bundle:true,platform:'node',format:'cjs',outfile:path.join(dir,'cloud.cjs')});
+ const originalFetch=globalThis.fetch;const originalStorage=globalThis.localStorage;const requests=[];
+ globalThis.localStorage={getItem:k=>k==='cm.githubPat'?'test-placeholder':null};
+ globalThis.fetch=async(url,options={})=>{requests.push({url,method:options.method});return new Response(JSON.stringify(String(url).endsWith('/user')?{login:'test'}:{private:false,default_branch:'main'}));};
+ try{await assert.rejects(()=>require(path.join(dir,'cloud.cjs')).renderInfoPrivate(spec,()=>{}),/已阻止上传/);assert.equal(requests.length,2);assert(requests.every(r=>!r.method||r.method==='GET'));}finally{globalThis.fetch=originalFetch;globalThis.localStorage=originalStorage;}
  console.log('PASS: six structures compile; bad imports rejected; canvas bounds; Focus item/conclusion separation; all animations fit video duration.');
 }finally{await rm(dir,{recursive:true,force:true});}

@@ -71,7 +71,7 @@ jobs:
           retention-days: 1
 `;
 
-async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+export async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const pat = getPat(); if (!pat) throw new Error('请先在 Motion 设置中填写 GitHub Token。');
   const r = await fetch(`https://api.github.com${path}`, { method, headers: { Authorization: `Bearer ${pat}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!r.ok) throw new Error(`GitHub ${r.status}：${r.status === 404 ? '仓库不存在，或 Token 没有访问权限。' : r.status === 403 ? '权限不足或 Actions 额度受限。' : '请求未成功，请检查 Token 权限和网络。'}`);

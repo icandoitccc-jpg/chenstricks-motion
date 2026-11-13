@@ -1,6 +1,7 @@
 // 云端渲染通用流程：dispatch → 轮询 → 下载 MP4（功能A/B 共用）
 import { useEffect, useRef, useState } from 'react';
 import type { AnimSpec } from '../../../src/spec/types';
+import { renderInfoPrivate } from './info-cloud';
 import { dispatchRender, waitForRun, downloadMp4, saveBlob, deleteUpload, uploadAsset } from './github';
 
 export interface RenderState {
@@ -23,11 +24,16 @@ export function useCloudRender() {
     fileName?: string;
     autoDownload?: boolean;
     compatible?: boolean;
+    privateInfo?: boolean;
   }) => {
     if(running.current)return; running.current=true; clearVideo();
     let uploadedPath = '';
     try {
       let spec = opts.spec;
+      if(opts.privateInfo){
+        const result=await renderInfoPrivate(spec,message=>setState({phase:'waiting',message}));
+        if(!mounted.current)return;const url=URL.createObjectURL(result.blob);currentUrl.current=url;setVideoUrl(url);setVideoName(opts.fileName??'motion-info.mp4');setState({phase:'done',message:'制作完成，可以预览和下载。'});return;
+      }
       if (opts.imageDataUrl) {
         setState({ phase: 'uploading', message: '上传图片素材…' });
         const up = await uploadAsset(opts.imageDataUrl);
