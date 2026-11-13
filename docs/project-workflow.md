@@ -47,3 +47,5 @@ app/public/motion-agent-guide.md是给新对话的统一规范，包含分工、
 只读服务`https://motion-guides.chens-tricks.workers.dev/mcp`使用Cloudflare Agents 0.33.0与MCP Server 2.4.0；不接AI模型、不使用KV/D1/Durable Object；现账户Free计划，无付费升级。仅`list_guides`/`read_guide`及一个规范resource，读取完整正文并返回版本/来源/内容SHA256；目录缓存60秒，正文每次按同一公开URL读取。此服务不读用户私人项目、音频或素材，也不返回总表到Motion；自动上传/音频对齐是另外的未完成能力。用`mcp/tests/smoke.mjs`验证官方SDK、2025客户端、完整正文hash、resource、未知ID和Origin拒绝。
 
 插件`motion-guides`只打包轻量Skill入口和MCP连接；Skill要求先读取服务端最新规范，不另存一套完整guide。私有插件ID plugins_6af67e927da8819182a8277b4b6c5a56，release pluginrel_6af67e93549881919a791bfa6fcf71e8；不重复创建。创建不等于所有客户端已连接，用户需首次启用。Codex/WorkBuddy的独立配置未实机验收；官方标准客户端通过不应冒充具体客户端通过。
+
+制作规范目录同时展示Guide和Skill：Guide正文维护于app/public/motion-agent-guide.md；Skill入口的单一源码在plugin/skills/plan-motion-video/SKILL.md，构建时生成motion-agent-skill.md供网页/MCP读取，不另手动复制一套。Guide当前0.1.1，明确规范读取已接通而项目/媒体MCP未接通。

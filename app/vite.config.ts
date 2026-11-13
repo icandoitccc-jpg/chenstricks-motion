@@ -11,6 +11,7 @@ export default defineConfig({
   plugins: [react(), {
     name: 'local-pdf-resources',
     generateBundle() {
+      this.emitFile({type:'asset',fileName:'motion-agent-skill.md',source:fs.readFileSync(path.resolve(__dirname,'../plugin/skills/plan-motion-video/SKILL.md'))});
       for (const dir of ['cmaps', 'standard_fonts']) {
         const root = path.resolve(__dirname, 'node_modules/pdfjs-dist', dir);
         for (const name of fs.readdirSync(root)) {
@@ -21,6 +22,7 @@ export default defineConfig({
     },
     configureServer(server) {
       server.middlewares.use((req,res,next) => {
+        if(req.url==='/motion-agent-skill.md'){res.setHeader('Content-Type','text/markdown; charset=utf-8');res.end(fs.readFileSync(path.resolve(__dirname,'../plugin/skills/plan-motion-video/SKILL.md')));return;}
         const match = req.url?.match(/^\/pdfjs\/(cmaps|standard_fonts)\/([a-zA-Z0-9_.-]+)$/);
         if (!match) return next();
         const file = path.resolve(__dirname, 'node_modules/pdfjs-dist', match[1], match[2]);

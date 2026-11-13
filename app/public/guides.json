@@ -5,10 +5,18 @@
     {
       "id": "production-planning",
       "title": "视频画面策划",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "kind": "guide",
       "summary": "供 ChatGPT、Codex、WorkBuddy 编排可导入的制作总表。包含交接格式、能力边界与验收规则。",
       "path": "motion-agent-guide.md"
+    },
+    {
+      "id": "agent-entry",
+      "title": "Agent 执行入口",
+      "version": "0.1.0",
+      "kind": "skill",
+      "summary": "插件中的 Skill 入口：先读取最新规范，再策划或检查制作总表。",
+      "path": "motion-agent-skill.md"
     }
   ],
   "pluginUrl": "https://chatgpt.com/plugins/plugins_6af67e927da8819182a8277b4b6c5a56"
