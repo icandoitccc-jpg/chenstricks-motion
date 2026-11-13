@@ -1,8 +1,8 @@
 import React, { useRef, useState } from 'react';
 import './file-drop.css';
 
-export function FileDrop({ accept, multiple = false, disabled = false, label, onFiles, children }: {
-  accept: string; multiple?: boolean; disabled?: boolean; label: string;
+export function FileDrop({ accept, multiple = false, disabled = false, label, onFiles, children, hint, unsupportedHint }: {
+  accept: string; multiple?: boolean; disabled?: boolean; label: string; hint?: string; unsupportedHint?: string;
   onFiles: (files: File[]) => void | Promise<void>; children: React.ReactNode;
 }) {
   const [active, setActive] = useState(false); const [error, setError] = useState(''); const depth = useRef(0);
@@ -15,7 +15,7 @@ export function FileDrop({ accept, multiple = false, disabled = false, label, on
     if (!multiple && files.length > 1) { setError('请一次拖入一个文件。'); return; }
     const rules = accept.toLowerCase().split(',').map(s=>s.trim());
     const wrong = files.find(f => !rules.some(rule => rule.startsWith('.') ? f.name.toLowerCase().endsWith(rule) : rule.endsWith('/*') ? f.type.toLowerCase().startsWith(rule.slice(0,-1)) : f.type.toLowerCase() === rule));
-    if (wrong) { setError(`不支持这个文件：${wrong.name}`); return; }
+    if (wrong) { setError(unsupportedHint ?? `不支持这个文件：${wrong.name}`); return; }
     try { await onFiles(files); } catch (e) { setError((e as Error).message); }
   };
   return <div className={`file-drop ${active ? 'is-dragging' : ''} ${disabled ? 'is-disabled' : ''}`} data-drop-label={label}
@@ -23,7 +23,7 @@ export function FileDrop({ accept, multiple = false, disabled = false, label, on
     onDragOver={e=>{if(!isFileDrag(e))return;e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect=unavailable(e.currentTarget)?'none':'copy';}}
     onDragLeave={e=>{e.preventDefault();e.stopPropagation();depth.current=Math.max(0,depth.current-1);if(!depth.current)setActive(false);}}
     onDrop={e=>void receive(e)}>
-    {children}<span className="file-drop-hint">{active ? '松开即可导入' : multiple ? '或拖入文件，可多选' : '或将文件拖到这里'}</span>
+    {children}<span className="file-drop-hint">{active ? '松开即可导入' : hint ?? (multiple ? '或拖入文件，可多选' : '或将文件拖到这里')}</span>
     {error && <span className="file-drop-error" role="alert">{error}</span>}
   </div>;
 }

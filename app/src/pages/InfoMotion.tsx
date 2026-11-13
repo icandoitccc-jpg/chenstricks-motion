@@ -49,7 +49,8 @@ export const InfoMotion: React.FC = () => {
       <div className="info-import">
         <a className="back-link" href="#/tools">← 返回素材工具</a>
         <h2 className="page-title">文字图解动画</h2>
-        <FileDrop label="图解方案" accept=".json" disabled={importing} onFiles={importFile}><label className="studio-file-button">导入图解方案<input disabled={importing} type="file" accept=".json" onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)void importFile([f]);}}/></label></FileDrop>
+        <p className="info-source-note">导入 ChatGPT 或 Agent 编排好的图解方案（JSON）。要在现有图片上框选动画，请使用<a href="#/a">图片局部动画</a>。</p>
+        <FileDrop hint="将图解方案 JSON 拖到这里" unsupportedHint="这里接收图解方案 JSON，不接收图片。请到“图片局部动画”上传图片。" label="图解方案" accept=".json" disabled={importing} onFiles={importFile}><label className="studio-file-button">导入图解方案（JSON）<input disabled={importing} type="file" accept=".json" onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)void importFile([f]);}}/></label></FileDrop>
         {error && <p className="info-error" role="alert">{error}</p>}
         <div className="info-input-actions"><button className="primary" disabled={importing} onClick={()=>applyManual(JSON.stringify(DIRECTOR_EXAMPLE))}>试用示例</button></div>
         <details><summary>粘贴或修改方案内容</summary><textarea aria-label="图解方案内容" className="code" rows={12} value={manualJson} onChange={e=>setManualJson(e.target.value)} style={{width:'100%'}}/><button disabled={importing} onClick={()=>applyManual()}>使用此方案</button></details>

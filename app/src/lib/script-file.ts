@@ -7,7 +7,7 @@ export async function readScriptFile(file: File): Promise<string> {
     const pdfjs = await import('pdfjs-dist');
     const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
     pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-    const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false });
+    const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false, cMapUrl: new URL('pdfjs/cmaps/', document.baseURI).href, cMapPacked: true, standardFontDataUrl: new URL('pdfjs/standard_fonts/', document.baseURI).href });
     const doc = await task.promise;
     try {
       if (doc.numPages > 100) throw new Error('稿件页数过多，请上传本期视频的终稿。');
@@ -27,7 +27,7 @@ export async function readScriptFile(file: File): Promise<string> {
   } else if (ext === 'txt' || ext === 'md') text = await file.text();
   else throw new Error('请上传PDF、Word（docx）或文字文件，也可以直接粘贴稿子。');
   text = text.trim();
-  if (!text) throw new Error('没有读到文字。扫描图片PDF需要先转成文字稿。');
+  if (!text) throw new Error('未提取到可用文字，原稿未被更改。可以复制文字粘贴到下方；如果是扫描件，请先转成文字稿。');
   if (text.length > 100000) throw new Error('稿件文字过多，请仅上传本期终稿。');
   return text;
 }

@@ -53,6 +53,7 @@ function adjustHold(base: Hold, rhythm: Rhythm): Hold {
 }
 
 export const ImageMotion: React.FC = () => {
+  const [canvasZoom,setCanvasZoom]=useState(1); const [wideCanvas,setWideCanvas]=useState(false);
   const [uploading,setUploading]=useState(false); const [uploadError,setUploadError]=useState('');
   const [image, setImage] = useState<ImageState | null>(null);
   const [aspect, setAspect] = useState<AspectKey>('16:9');
@@ -97,7 +98,7 @@ export const ImageMotion: React.FC = () => {
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        setImage({ dataUrl: reader.result as string, w: img.naturalWidth, h: img.naturalHeight });
+        setCanvasZoom(1);setImage({ dataUrl: reader.result as string, w: img.naturalWidth, h: img.naturalHeight });
         setItems([]);
         setSelected(null); setUploading(false);
       };
@@ -345,7 +346,7 @@ export const ImageMotion: React.FC = () => {
         </div>
       )}
 
-      <div className="a-layout">
+      <div className={`a-layout ${wideCanvas ? 'canvas-wide' : ''}`}>
         <div>
           {items.length === 0 ? (
             <div className="card" style={{ marginBottom: 12, borderColor: 'var(--accent)', background: 'rgba(232,163,61,0.08)' }}>
@@ -361,12 +362,18 @@ export const ImageMotion: React.FC = () => {
               </span>
             </div>
           )}
+          <div className="canvas-toolbar">
+            <label>画布大小<select aria-label="画布缩放" value={canvasZoom} onChange={e=>setCanvasZoom(Number(e.target.value))}>
+              <option value={1}>适合宽度</option><option value={1.5}>放大 150%</option><option value={2}>放大 200%</option><option value={3}>放大 300%</option>
+            </select></label>
+            <button className="ghost" aria-pressed={wideCanvas} onClick={()=>setWideCanvas(v=>!v)}>{wideCanvas?'恢复左右布局':'展开大画布'}</button>
+          </div>
           <div className="canvas-scroll" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
             <div
               ref={canvasRef}
               className="canvas-wrap"
               style={{
-                width: '100%', maxWidth: image.w,
+                width: `${canvasZoom*100}%`, maxWidth: 'none',
                 aspectRatio: `${image.w} / ${image.h}`, cursor: 'crosshair',
               }}
               onMouseDown={onMouseDown}
