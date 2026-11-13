@@ -1,3 +1,4 @@
+import { checkPortableContract } from './production-contract';
 export type SceneKind = 'info' | 'image' | 'video';
 export type Template = 'focus' | 'steps' | 'comparison' | 'list';
 export interface Sentence { id: string; text: string; start: number | null; end: number | null }
@@ -134,6 +135,7 @@ export function parseProject(raw: string): Project {
 export function parseProductionPlan(raw: string, current: Project): Project {
   let d = record(JSON.parse(raw));
   if (d.binding === 'script') {
+    checkPortableContract(d);
     if (!current.scriptText?.trim() || current.draftText !== current.scriptText) throw new Error('请先确认当前终稿，再导入制作总表。');
     if (['projectId','audioRevision','scriptRevision'].some(key=>d[key] !== undefined)) throw new Error('按原文匹配的总表不应携带其他项目编号或版本。');
     if (!Array.isArray(d.sentences) || !d.sentences.length) throw new Error('制作总表需要完整原文，才能匹配当前项目。');

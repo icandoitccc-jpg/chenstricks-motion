@@ -11,7 +11,7 @@ Project 是唯一制作数据源。`scriptText` 是确认后的终稿，`draftTe
 `workflow.ts` 集中定义迁移、步骤条件、恢复位置和进度文案，界面不能各自猜测进度。`project-files.ts` 以项目ID保存数据，串行化写入；离开项目时提交最后快照，列表读取等待写入完成。旧项目保留句子ID、素材关系及实际时间。
 
 ## 变更规则
-确认修改终稿前说明影响；确认后清除旧分镜及句子时间，保留原始媒体供重新使用。未确认的文字修改不能继续使用旧安排导出。总表必须保留项目ID、终稿版本、录音版本与原文；不允许通过导入总表悄悄改稿。
+确认修改终稿前说明影响；确认后清除旧分镜及句子时间，保留原始媒体供重新使用。未确认的文字修改不能继续使用旧安排导出。普通策划总表按完整原文匹配，不要求Agent或用户提供内部项目编号；旧的项目绑定格式仍保留ID/版本校验。任何格式都不允许通过导入总表悄悄改稿。
 
 换录音后清除旧时间，画面句子绑定保留。缺素材只阻断受影响段落；整片导出必须检查全部所需资料。显示“生成完成”必须以真实结果为依据，不能根据进入某页面或点击某按钮判断。
 
@@ -34,3 +34,8 @@ Project 是唯一制作数据源。`scriptText` 是确认后的终稿，`draftTe
 ## Script-bound plans (2026-11-13)
 
 Normal planning accepts `{version:1,binding:"script",sentences,assets,scenes}`. Do not require users to export internal project metadata. Require the complete final script, preserving punctuation; ignore only whitespace when comparing. Portable plans carry no projectId/audioRevision/scriptRevision and no timing (start/end must be null). Bind to the current project only after exact full-script validation. Map exact sentence boundaries back to current IDs and authoritative times; reject changes to boundaries when timing exists. Existing explicitly project-bound tables retain strict ID/version checks. No recording, media lookup or AI inference is performed by this binding step.
+
+
+## 跨Agent交接
+
+app/public/motion-agent-guide.md是给新对话的统一规范，包含分工、能力表、portable格式、中性示例、缺信息处理及比较标准。scripts/validate-production-plan.mjs直接调用产品parser做验收，不另写一套相似规则。production-contract.ts在portable总表导入前阻断空/过量图解、错误对比结构、倒序/缺失/重复原文、未实现模板和错误动效参数，避免到制作才暴露错误。独立Agent的真实策划结果由用户另开对话获得，未进行前不能声称跨Agent验收通过。
