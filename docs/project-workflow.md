@@ -29,3 +29,8 @@ Project 是唯一制作数据源。`scriptText` 是确认后的终稿，`draftTe
 3. 修改终稿使旧方案失效，旧版本和原文不一致的总表均被拒绝。
 4. 用已有真实音频项目检查分段卡片、录音预览和项目迁移，确认旧能力未被入口重构破坏。
 5. 后续再验证自动对齐、新分段MP4回传、混合媒体和云端清理，不把这些能力写成已经完成。
+
+
+## Script-bound plans (2026-11-13)
+
+Normal planning accepts `{version:1,binding:"script",sentences,assets,scenes}`. Do not require users to export internal project metadata. Require the complete final script, preserving punctuation; ignore only whitespace when comparing. Portable plans carry no projectId/audioRevision/scriptRevision and no timing (start/end must be null). Bind to the current project only after exact full-script validation. Map exact sentence boundaries back to current IDs and authoritative times; reject changes to boundaries when timing exists. Existing explicitly project-bound tables retain strict ID/version checks. No recording, media lookup or AI inference is performed by this binding step.

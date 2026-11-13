@@ -14,6 +14,15 @@ try {
  p=m.parseProductionPlan(JSON.stringify(table),p);assert(w.hasPlan(p));assert(w.canOpenStep(p,'audio'));p.currentStep='plan';assert.equal(w.resumeStep(m.parseProject(JSON.stringify(p))),'plan');
  assert.throws(()=>m.parseProductionPlan(JSON.stringify({...table,scriptRevision:99}),p));
  assert.throws(()=>m.parseProductionPlan(JSON.stringify({...table,sentences:p.sentences.map((s,i)=>i?{...s,text:'悄悄改稿。'}:s)}),p));
+ const portable={...table,binding:'script',projectId:undefined,audioRevision:undefined,scriptRevision:undefined,sentences:p.sentences.map((s,i)=>({...s,id:'P'+i,start:null,end:null})),scenes:[{...table.scenes[0],sentenceIds:['P0','P1']}]};
+ const portableResult=m.parseProductionPlan(JSON.stringify(portable),p);assert(w.hasPlan(portableResult));assert.deepEqual(portableResult.scenes[0].sentenceIds,p.sentences.map(s=>s.id));
+ const second=w.confirmDraft(m.newProject(),p.scriptText);assert.equal(m.parseProductionPlan(JSON.stringify(portable),second).id,second.id);
+ assert.throws(()=>m.parseProductionPlan(JSON.stringify({...portable,projectId:'other'}),p));
+ assert.throws(()=>m.parseProductionPlan(JSON.stringify({...portable,sentences:portable.sentences.map((s,i)=>i?s:{...s,text:'不同原文。'})}),p));
+ assert.throws(()=>m.parseProductionPlan(JSON.stringify({...portable,sentences:portable.sentences.map((s,i)=>({...s,start:i,end:i+1}))}),p));
+ assert.throws(()=>m.parseProductionPlan(JSON.stringify(portable),{...p,draftText:'未确认修改'}));
+ const timed={...p,sentences:p.sentences.map((s,i)=>({...s,start:i,end:i+1}))};const kept=m.parseProductionPlan(JSON.stringify(portable),timed);assert.equal(kept.sentences[1].end,2);
+ const merged={...portable,sentences:[{id:'all',text:p.scriptText,start:null,end:null}],scenes:[{...table.scenes[0],sentenceIds:['all']}]};assert.throws(()=>m.parseProductionPlan(JSON.stringify(merged),timed));assert.equal(m.parseProductionPlan(JSON.stringify(merged),p).sentences.length,1);
  const draftEdit={...p,draftText:'不同终稿。'};assert(!w.hasDraft(draftEdit));assert(!w.canOpenStep(draftEdit,'scenes'));assert(m.validateProject(draftEdit).some(i=>i.message.includes('终稿')));
  const changed=w.confirmDraft(draftEdit,draftEdit.draftText);assert.equal(changed.scriptRevision,2);assert.equal(changed.scenes.length,0);assert.equal(changed.sentences[0].start,null);
  const legacy=m.newProject();legacy.sentences=m.parseSrt('1\n00:00:00,000 --> 00:00:02,000\n一句话');legacy.scenes=[m.newScene(['S001'])];legacy.assets=[{id:'audio',name:'x.mp3',kind:'audio',size:1,mime:'audio/mpeg',duration:2}];legacy.audioAssetId='audio';const migrated=w.prepareWorkflow(legacy);assert.equal(migrated.sentences[0].id,'S001');assert.equal(migrated.sentences[0].end,2);assert(w.hasTiming(migrated));assert.equal(w.resumeStep(migrated),'scenes');

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { compileScenes, formatTime, newProject, newScene, parseProductionPlan, pendingAsset, parseSrt, uid, validateProject, type Project, type Scene, type Sentence } from '../lib/project';
-import { loadProject, saveProject, mediaMetadata, planningPacket, projectZip } from '../lib/project-files';
+import { loadProject, saveProject, mediaMetadata, projectZip } from '../lib/project-files';
 import { projectHtml } from '../lib/project-render';
 import { renderProjectCloud } from '../lib/project-cloud';
 import { saveBlob } from '../lib/github';
@@ -95,7 +95,6 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
   const sentenceChange = (id: string, patch: Partial<Sentence>) => setProject(p => ({ ...p, sentences: p.sentences.map(s => s.id === id ? { ...s, ...patch } : s) }));
   const sceneChange = (patch: Partial<Scene>) => setProject(p => ({ ...p, scenes: p.scenes.map(s => s.id === selected ? { ...s, ...patch } : s) }));
   const addScene = () => { const used = new Set(project.scenes.flatMap(s => s.sentenceIds)); const first = project.sentences.find(s => !used.has(s.id)); const sc = newScene(first ? [first.id] : []); update({ scenes: [...project.scenes, sc] }); setSelected(sc.id); };
-  const downloadText = (text: string, name: string) => saveBlob(new Blob([text], { type: 'application/json;charset=utf-8' }), name);
   const readFile = (fn: (file: File) => Promise<void>) => (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void attempt(() => fn(f)); };
   const importSubtitles = async (f: File) => {
     const sentences = parseSrt(await f.text());
@@ -167,7 +166,7 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
       <textarea aria-label="最终稿" rows={18} value={project.draftText??''} onChange={e=>update({draftText:e.target.value})}/>
       <div className="draft-footer"><span>{hasDraft(project)?'终稿已保存':'终稿修改中'}</span><button disabled={!project.draftText?.trim() || hasDraft(project)} onClick={()=>void attempt(saveDraft)}>保存终稿</button></div>
     </section>}
-    {tab==='plan' && <section><div className="studio-section-heading"><h2>画面安排</h2><div className="studio-actions"><button onClick={()=>downloadText(planningPacket(project),'motion-planning.md')}>下载制作资料</button><FileDrop label=".json" accept=".json" disabled={busy} onFiles={files=>attempt(()=>importPlan(files[0]))}><label className="studio-file-button prominent">导入制作总表<input type="file" accept=".json" onChange={readFile(importPlan)}/></label></FileDrop></div></div>
+    {tab==='plan' && <section><div className="studio-section-heading"><h2>画面安排</h2><div className="studio-actions"><FileDrop label=".json" accept=".json" disabled={busy} onFiles={files=>attempt(()=>importPlan(files[0]))}><label className="studio-file-button prominent">导入制作总表<input type="file" accept=".json" onChange={readFile(importPlan)}/></label></FileDrop></div></div>
       {!project.scenes.length && <div className="step-empty"><p>还没有画面安排。</p><a href="#/help">如何准备制作总表？</a></div>}
       {!!project.scenes.length && <SceneBoard project={project} files={files} selected={selected} busy={busy} planning generated={new Set()} onSelect={setSelected} onBatch={()=>{}} onRender={()=>{}}/>}
       {scene && <details className="scene-edit-options"><summary>修改这一段的画面安排</summary><SceneEditor project={project} scene={scene} onChange={sceneChange} onDelete={()=>{update({scenes:project.scenes.filter(s=>s.id!==selected)});setSelected('');}} onDuplicate={()=>{const copy={...scene,id:uid('scene'),sentenceIds:[]};update({scenes:[...project.scenes,copy]});setSelected(copy.id);}}/></details>}

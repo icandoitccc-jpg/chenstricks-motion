@@ -132,7 +132,29 @@ export function parseProject(raw: string): Project {
 
 /** Import a single execution table, retaining audio and local file ownership. */
 export function parseProductionPlan(raw: string, current: Project): Project {
-  const d = record(JSON.parse(raw));
+  let d = record(JSON.parse(raw));
+  if (d.binding === 'script') {
+    if (!current.scriptText?.trim() || current.draftText !== current.scriptText) throw new Error('请先确认当前终稿，再导入制作总表。');
+    if (['projectId','audioRevision','scriptRevision'].some(key=>d[key] !== undefined)) throw new Error('按原文匹配的总表不应携带其他项目编号或版本。');
+    if (!Array.isArray(d.sentences) || !d.sentences.length) throw new Error('制作总表需要完整原文，才能匹配当前项目。');
+    const norm=(s:string)=>s.replace(/\s/g,'');
+    const incoming=d.sentences.map(x=>record(x));
+    if(incoming.some(s=>typeof s.text!=='string'||s.start!==null||s.end!==null)) throw new Error('画面安排总表只规划画面，录音时间请留空，由录音步骤处理。');
+    if(norm(incoming.map(s=>s.text).join(''))!==norm(current.scriptText)) throw new Error('制作总表与当前终稿不一致，请按当前终稿重新安排画面。');
+    let offset=0;const existing=new Map<string,Sentence>();
+    for(const sentence of current.sentences){const length=norm(sentence.text).length;existing.set(`${offset}:${offset+length}`,sentence);offset+=length;}
+    offset=0;const remap=new Map<string,string>();let changedBoundaries=false;
+    const sentences=incoming.map(s=>{const text=s.text as string,length=norm(text).length,previous=existing.get(`${offset}:${offset+length}`);offset+=length;
+      if(!previous)changedBoundaries=true;
+      const id=previous?.id??s.id;remap.set(s.id as string,id as string);
+      return {...s,id,start:previous?.start??null,end:previous?.end??null};
+    });
+    if(changedBoundaries&&current.sentences.some(s=>s.start!==null||s.end!==null)) throw new Error('总表的分句与已同步录音不同，请保留现有分句后重新安排。');
+    if(!Array.isArray(d.scenes)) throw new Error('制作总表缺少画面安排。');
+    const scenes=d.scenes.map(x=>{const sc=record(x);return {...sc,sentenceIds:Array.isArray(sc.sentenceIds)?sc.sentenceIds.map(id=>remap.get(id as string)??id):sc.sentenceIds};});
+    d={...d,projectId:current.id,audioRevision:current.audioRevision,scriptRevision:current.scriptRevision,sentences,scenes};
+    raw=JSON.stringify(d);
+  }
   if (d.projectId !== current.id || d.audioRevision !== current.audioRevision) throw new Error('总表属于其他项目或旧录音，请用当前制作资料重新生成。');
   if (current.scriptText && d.scriptRevision !== current.scriptRevision) throw new Error('总表对应的终稿已变化，请使用当前稿件重新生成。');
   const p: Project = { ...current, assets: [...current.assets] };
