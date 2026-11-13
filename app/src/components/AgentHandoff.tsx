@@ -3,7 +3,7 @@ import {parseProductionPlan,type Project} from '../lib/project';
 const BASE='https://motion-guides.chens-tricks.workers.dev';
 interface Link {ownerKey:string;accessKey:string;expires:number;revision:number;base:string}
 const snapshot=(p:Project)=>JSON.stringify([p.id,p.scriptText,p.draftText,p.scriptRevision,p.audioRevision,p.sentences,p.scenes,p.assets]);
-async function request(path:string,key?:string,data?:unknown){const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{})},body:JSON.stringify(data??{})});const d=await r.json();if(!r.ok)throw new Error(d.error??'交接暂时不可用。');return d;}
+async function request(path:string,key?:string,data?:unknown){const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{})},body:JSON.stringify(data??{})});const d=await r.json();if(!r.ok)throw Object.assign(new Error(d.error??'交接暂时不可用。'),{status:r.status});return d;}
 export const AgentHandoff:React.FC<{project:Project;onApply:(p:Project)=>Promise<void>}>=({project,onApply})=>{
  const storageKey='motion.handoff.'+project.id;
  const [link,setLink]=useState<Link|null>(()=>{try{const l=JSON.parse(localStorage.getItem(storageKey)??'null');return l?.expires>Date.now()?l:null;}catch{return null;}});
@@ -11,7 +11,7 @@ export const AgentHandoff:React.FC<{project:Project;onApply:(p:Project)=>Promise
  const latest=useRef(project);latest.current=project;
  const save=(l:Link|null)=>{setLink(l);if(l)localStorage.setItem(storageKey,JSON.stringify(l));else localStorage.removeItem(storageKey);};
  useEffect(()=>{if(!link)return;let live=true,inFlight=false;
-  const check=async()=>{if(inFlight||document.hidden)return;inFlight=true;try{const d=await request('/handoff/read',link.ownerKey);if(live&&d.plan&&d.revision>link.revision)setPending({plan:d.plan,revision:d.revision});}catch(e){if(live)setMessage((e as Error).message);}finally{inFlight=false;}};
+  const check=async()=>{if(inFlight||document.hidden)return;inFlight=true;try{const d=await request('/handoff/read',link.ownerKey);if(live&&d.plan&&d.revision>link.revision)setPending({plan:d.plan,revision:d.revision});}catch(e){if(live){setMessage((e as Error).message);if((e as {status?:number}).status===401){localStorage.removeItem(storageKey);setLink(null);setPending(null);}}}finally{inFlight=false;}};
   void check();const timer=setInterval(check,12000);return()=>{live=false;clearInterval(timer);};
  },[link]);
  const run=async(fn:()=>Promise<void>)=>{setBusy(true);setMessage('');try{await fn();}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}};

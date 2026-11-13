@@ -55,7 +55,7 @@ export default {
     if(request.method!=='GET')return new Response('Method not allowed',{status:405});
     if(request.headers.has('Origin')&&!READ_ORIGINS.includes(request.headers.get('Origin')!))return new Response('Origin not allowed',{status:403});
     const headers={'Content-Type':'application/json; charset=utf-8','Access-Control-Allow-Origin':READ_ORIGINS[0],'Cache-Control':'no-store'};
-    if(path==='/health')return Response.json({service:'motion-guides',version:'0.1.0',readOnly:true,privateProjectAccess:false},{headers});
+    if(path==='/health')return Response.json({service:'motion-guides',version:'0.2.0',publicGuidesReadOnly:true,projectAccess:'per-project temporary capability',mediaAccess:false},{headers});
     try{
       if(path==='/'||path==='/guides')return Response.json({guides:await catalog(),mcp:ENDPOINT,website:BASE+'#/guides'},{headers});
       if(path.startsWith('/guides/')){const g=await read(decodeURIComponent(path.slice(8)));return new Response(g.text,{headers:{...headers,'Content-Type':'text/markdown; charset=utf-8','X-Content-SHA256':g.sha256}});}
