@@ -39,3 +39,11 @@ Normal planning accepts `{version:1,binding:"script",sentences,assets,scenes}`. 
 ## 跨Agent交接
 
 app/public/motion-agent-guide.md是给新对话的统一规范，包含分工、能力表、portable格式、中性示例、缺信息处理及比较标准。scripts/validate-production-plan.mjs直接调用产品parser做验收，不另写一套相似规则。production-contract.ts在portable总表导入前阻断空/过量图解、错误对比结构、倒序/缺失/重复原文、未实现模板和错误动效参数，避免到制作才暴露错误。独立Agent的真实策划结果由用户另开对话获得，未进行前不能声称跨Agent验收通过。
+
+## 规范目录与只读MCP（2026-11-13）
+
+`app/public/guides.json`维护目录，正文仍在`motion-agent-guide.md`，网页与MCP共用同一来源。`#/guides`可列出、阅读、下载、复制入口和连接地址，不把格式说明堆回制作步骤。
+
+只读服务`https://motion-guides.chens-tricks.workers.dev/mcp`使用Cloudflare Agents 0.33.0与MCP Server 2.4.0；不接AI模型、不使用KV/D1/Durable Object；现账户Free计划，无付费升级。仅`list_guides`/`read_guide`及一个规范resource，读取完整正文并返回版本/来源/内容SHA256；目录缓存60秒，正文每次按同一公开URL读取。此服务不读用户私人项目、音频或素材，也不返回总表到Motion；自动上传/音频对齐是另外的未完成能力。用`mcp/tests/smoke.mjs`验证官方SDK、2025客户端、完整正文hash、resource、未知ID和Origin拒绝。
+
+插件`motion-guides`只打包轻量Skill入口和MCP连接；Skill要求先读取服务端最新规范，不另存一套完整guide。私有插件ID plugins_6af67e927da8819182a8277b4b6c5a56，release pluginrel_6af67e93549881919a791bfa6fcf71e8；不重复创建。创建不等于所有客户端已连接，用户需首次启用。Codex/WorkBuddy的独立配置未实机验收；官方标准客户端通过不应冒充具体客户端通过。

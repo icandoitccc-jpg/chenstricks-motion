@@ -1,0 +1,1 @@
+{"$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json","mcpServers":{"motion-guides":{"type":"streamable-http","url":"https://motion-guides.chens-tricks.workers.dev/mcp","extensions":{"com.openai":{"auth":{"type":"none"}}}}}}
