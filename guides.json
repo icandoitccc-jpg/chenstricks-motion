@@ -13,7 +13,7 @@
     {
       "id": "agent-entry",
       "title": "Agent 执行入口",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "kind": "skill",
       "summary": "插件中的 Skill 入口：先读取最新规范，再策划或检查制作总表。",
       "path": "motion-agent-skill.md"
