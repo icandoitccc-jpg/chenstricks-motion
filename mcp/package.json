@@ -1,0 +1,1 @@
+{"name":"motion-guides-mcp","version":"0.1.0","private":true,"type":"module","dependencies":{"@modelcontextprotocol/server":"2.4.0","agents":"0.33.0","zod":"^4.0.0"},"devDependencies":{"@modelcontextprotocol/client":"^2.4.0"}}

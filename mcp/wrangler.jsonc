@@ -1,0 +1,12 @@
+{
+  "name": "motion-guides",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-11",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "observability": {
+    "enabled": false
+  }
+}
