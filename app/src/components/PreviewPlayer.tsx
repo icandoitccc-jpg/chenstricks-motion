@@ -8,7 +8,7 @@ export const PreviewPlayer: React.FC<{ spec: AnimSpec; autoPlay?: boolean; style
   spec, autoPlay = true, style,
 }) => {
   return (
-    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--stroke)', background: '#000', ...style }}>
+    <div role="region" aria-label="动画预览" style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--stroke)', background: '#000', ...style }}>
       <Player
         component={SpecComposition}
         inputProps={{ spec }}

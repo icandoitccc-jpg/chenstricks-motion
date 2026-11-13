@@ -1,5 +1,5 @@
 // 云端渲染通用流程：dispatch → 轮询 → 下载 MP4（功能A/B 共用）
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AnimSpec } from '../../../src/spec/types';
 import { dispatchRender, waitForRun, downloadMp4, saveBlob, deleteUpload, uploadAsset } from './github';
 
@@ -13,11 +13,18 @@ const Q4_ENCODE = { crf: 8, imageFormat: 'png', x264Preset: 'slow', pixelFormat:
 export function useCloudRender() {
   const [state, setState] = useState<RenderState>({ phase: 'idle', message: '' });
 
+  const [videoUrl,setVideoUrl]=useState(''); const [videoName,setVideoName]=useState('motion.mp4'); const currentUrl=useRef(''); const running=useRef(false); const mounted=useRef(true);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;if(currentUrl.current)URL.revokeObjectURL(currentUrl.current);};},[]);
+  const clearVideo=()=>{if(currentUrl.current)URL.revokeObjectURL(currentUrl.current);currentUrl.current='';setVideoUrl('');};
+
   const run = async (opts: {
     spec: AnimSpec;
     imageDataUrl?: string;   // 功能A：需要先把图片传到仓库
     fileName?: string;
+    autoDownload?: boolean;
+    compatible?: boolean;
   }) => {
+    if(running.current)return; running.current=true; clearVideo();
     let uploadedPath = '';
     try {
       let spec = opts.spec;
@@ -38,7 +45,7 @@ export function useCloudRender() {
         description: opts.fileName ?? 'app render',
         concurrency: 2,
         stills: [],
-        encode: Q4_ENCODE,
+        encode: opts.compatible ? {...Q4_ENCODE,pixelFormat:'yuv420p'} : Q4_ENCODE,
         spec,
       };
       const t0 = await dispatchRender(JSON.stringify(job));
@@ -48,14 +55,17 @@ export function useCloudRender() {
       if (conclusion !== 'success') throw new Error(`云端渲染失败（${conclusion}），请到 GitHub Actions 查看日志`);
       setState({ phase: 'downloading', message: '下载 MP4…' });
       const { blob, name } = await downloadMp4(runId);
-      saveBlob(blob, opts.fileName ?? name);
-      setState({ phase: 'done', message: `✓ 已下载 ${opts.fileName ?? name}（云端素材已自动清理）` });
+      if(!mounted.current)return;
+      const url=URL.createObjectURL(blob.slice(0,blob.size,'video/mp4'));currentUrl.current=url;setVideoUrl(url);setVideoName(opts.fileName??name);
+      if(opts.autoDownload!==false)saveBlob(blob,opts.fileName??name);
+      setState({phase:'done',message:opts.autoDownload===false?'制作完成，可以预览和下载。':`已下载 ${opts.fileName??name}`});
     } catch (e) {
       setState({ phase: 'error', message: (e as Error).message });
     } finally {
+      running.current=false;
       if (uploadedPath) deleteUpload(uploadedPath); // 即用即删，不阻断
     }
   };
 
-  return { ...state, run, reset: () => setState({ phase: 'idle', message: '' }) };
+  return { ...state, videoUrl, videoName, run, reset: () => {clearVideo();setState({ phase: 'idle', message: '' });} };
 }

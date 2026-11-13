@@ -1,5 +1,6 @@
 // 功能B 排版引擎（确定性）：DirectorOutput（语义，无坐标）→ AnimSpec（含坐标）
 // 规则：AI 不碰坐标；所有 x/y/w/h/字号/间距由本文件决定。
+import { compileSpec } from '../../../src/spec/compile';
 import type { AnimSpec, Beat, DirectorOutput, SpecAction, SpecElement } from '../../../src/spec/types';
 
 const W = 1920, H = 1080, FPS = 30;
@@ -12,7 +13,9 @@ const C = {
 interface Ctx { els: SpecElement[]; acts: SpecAction[]; beats: Beat[] }
 
 function text(id: string, t: string, x: number, y: number, w: number, o: Partial<SpecElement> = {}): SpecElement {
-  return { id, kind: 'text', text: t, x, y, w, fontSize: 40, fontWeight: 500, color: C.text, align: 'center', z: 3, ...o };
+  const units=Array.from(t).reduce((n,c)=>n+(/[\u0000-\u00ff]/.test(c)?.55:1),0);
+  const fontSize=Math.min(o.fontSize??40, Math.max(24,Math.floor((w-16)/Math.max(1,units))));
+  return { id, kind: 'text', text: t, x, y, w, fontWeight: 500, color: C.text, align: 'center', z: 3, ...o, fontSize };
 }
 function box(id: string, x: number, y: number, w: number, h: number, o: Partial<SpecElement> = {}): SpecElement {
   return { id, kind: 'box', x, y, w, h, bg: C.card, borderColor: C.stroke, borderWidth: 1.5, radius: 14, z: 2, ...o };
@@ -188,7 +191,7 @@ function layoutConvergence(d: DirectorOutput): Ctx {
   const items = d.items ?? [];
   const cx = W / 2, cy = 620;
   const n = items.length;
-  const bw = 320, bh = 80, gap = 60;
+  const bw = Math.min(320,(W-240-(n-1)*60)/Math.max(1,n)), bh = 80, gap = 60;
   const total = n * bw + (n - 1) * gap;
   const x0 = (W - total) / 2, y = 260;
   items.forEach((s, i) => {
@@ -220,11 +223,11 @@ function layoutFocus(d: DirectorOutput): Ctx {
     { id: 'b1', label: '呈现核心' }, { id: 'b2', label: '强调' },
   ]};
   const main = d.title ?? d.center ?? d.conclusion ?? '';
-  ctx.els.push(text('main', main, W / 2 - 600, 420, 1200, { fontSize: 84, fontWeight: 800, lineHeight: 1.35 }));
+  ctx.els.push(text('main', main, W / 2 - 600, d.items?.length ? 270 : 420, 1200, { fontSize: 84, fontWeight: 800, lineHeight: 1.35 }));
   ctx.acts.push({ action: 'typeIn', target: 'main', beat: 'b1', offset: 0, speed: 'normal' });
   const items = d.items ?? [];
   items.forEach((s, i) => {
-    const y = 660 + i * 90;
+    const y = 500 + i * 100;
     ctx.els.push({ id: `i${i}c`, kind: 'icon', icon: 'check', x: W / 2 - 320, y, w: 40, color: C.green, z: 3 });
     ctx.els.push(text(`i${i}`, s, W / 2 - 260, y - 2, 620, { fontSize: 36, align: 'left' }));
   });
@@ -260,10 +263,12 @@ export function layoutDirectorOutput(d: DirectorOutput): AnimSpec {
       if (ctx.beats[i]) { ctx.beats[i].label = b.label; if (b.purpose) ctx.beats[i].purpose = b.purpose; }
     });
   }
+  // Expand stagger groups so beat timing includes the final item and respects offsets.
+  ctx.acts=ctx.acts.flatMap(a=>a.action==='stagger' ? (a.targets??[a.target]).map((target,i)=>({...a,action:'slideIn' as const,target,targets:undefined,offset:(a.offset??0)+i*(a.staggerGap??8),direction:'up' as const})) : [a]);
   // 估算时长：最后一拍结束 + 1.5s 收尾（编译层会算精确帧，这里给足上限）
   const perBeat = 2.6;
   const seconds = Math.max(8, ctx.beats.length * perBeat + 2.5);
-  return {
+  const spec: AnimSpec = {
     version: 1,
     meta: {
       width: W, height: H, fps: FPS,
@@ -275,4 +280,8 @@ export function layoutDirectorOutput(d: DirectorOutput): AnimSpec {
     beats: ctx.beats,
     actions: ctx.acts,
   };
+  const compiled=compileSpec(spec);
+  const end=Math.max(0,...compiled.actions.map(a=>(a.at??0)+(a.duration??0)));
+  spec.meta.durationInFrames=Math.max(spec.meta.durationInFrames,end+Math.round(1.5*FPS));
+  return spec;
 }

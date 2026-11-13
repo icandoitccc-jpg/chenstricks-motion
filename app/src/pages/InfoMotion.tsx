@@ -1,13 +1,15 @@
 // 功能B：文字图解动画
-// 输入 → AI 分析（先给可编辑方案，确认后才生成）→ 分镜 → 低清预览 → 细节调整 → 云端高清 MP4
+// 结构化方案 → 编辑 → 预览 → 云端MP4；不在产品内调用AI。
 import React, { useMemo, useState } from 'react';
 import type { DirectorOutput, StructureName } from '../../../src/spec/types';
 import { DIRECTOR_EXAMPLE } from '../lib/director';
 import { layoutDirectorOutput } from '../lib/layout';
 import { PreviewPlayer } from '../components/PreviewPlayer';
+import { FileDrop } from '../components/FileDrop';
+import { parseInfoPlan, validateInfoPlan } from '../lib/info-plan';
 import { useCloudRender } from '../lib/useCloudRender';
 
-type Phase = 'input' | 'analyzing' | 'plan' | 'preview';
+type Phase = 'input' | 'plan' | 'preview';
 
 const STRUCTURES: { key: StructureName; label: string }[] = [
   { key: 'Comparison', label: '对比' },
@@ -23,71 +25,63 @@ export const InfoMotion: React.FC = () => {
   const [plan, setPlan] = useState<DirectorOutput | null>(null);
   const [error, setError] = useState('');
   const [manualJson, setManualJson] = useState(JSON.stringify(DIRECTOR_EXAMPLE, null, 2));
-  const showManual = true;
+  const [importing,setImporting]=useState(false);
   const cloud = useCloudRender();
 
-  const spec = useMemo(() => (plan ? layoutDirectorOutput(plan) : null), [plan]);
-
-  const applyManual = () => {
-    try {
-      const d = JSON.parse(manualJson) as DirectorOutput;
-      if (!d.primaryStructure) throw new Error('缺少 primaryStructure');
-      setPlan(d);
-      setError('');
-      setPhase('plan');
-    } catch (e) {
-      setError(`JSON 解析失败：${(e as Error).message}`);
-    }
+  const built = useMemo(() => {
+    if(!plan)return {spec:null,error:''};
+    try { return {spec:layoutDirectorOutput(validateInfoPlan(plan)),error:''}; }
+    catch(e){return {spec:null,error:(e as Error).message};}
+  },[plan]);
+  const spec=built.spec;
+  const applyManual = (raw=manualJson) => {
+    try {const d=parseInfoPlan(raw);cloud.reset();setPlan(d);setManualJson(JSON.stringify(d,null,2));setError('');setPhase('plan');}
+    catch(e){setError((e as Error).message);}
   };
-
-  const updatePlan = (patch: Partial<DirectorOutput>) => setPlan((p) => (p ? { ...p, ...patch } : p));
+  const importFile = async(files:File[])=>{
+    setImporting(true);setError('');try{if(files[0].size>64000)throw new Error('图解方案过大，请只导入一个片段。');applyManual(await files[0].text());}catch(e){setError((e as Error).message);}finally{setImporting(false);}
+  };
+  const updatePlan = (patch: Partial<DirectorOutput>) => {cloud.reset();setPlan((p) => (p ? { ...p, ...patch } : p));};
 
   // ---------- 输入阶段 ----------
-  if (phase === 'input' || phase === 'analyzing') {
+  if (phase === 'input') {
     return (
-      <div style={{ maxWidth: 720 }}>
-        <div className="row" style={{ marginBottom: 6 }}>
-          <a className="ghost" href="#/tools" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回素材工具</a>
-        </div>
+      <div className="info-import">
+        <a className="back-link" href="#/tools">← 返回素材工具</a>
         <h2 className="page-title">文字图解动画</h2>
-        <p className="page-sub">用ChatGPT编排的方案制作对比、流程或重点图解片段。</p>
-        <div className="card col" style={{ gap: 12 }}>
-          {error && <p role="alert">{error}</p>}
-          {showManual && (
-            <div className="col" style={{ gap: 8 }}>
-              <span className="muted">图解方案（JSON内容，下方已填入示例）</span>
-              <textarea className="code" rows={12} value={manualJson} onChange={(e) => setManualJson(e.target.value)} style={{ width: '100%' }} />
-              <div><button className="blue" onClick={applyManual}>使用此方案 →</button></div>
-            </div>
-          )}
-        </div>
+        <FileDrop label="图解方案" accept=".json" disabled={importing} onFiles={importFile}><label className="studio-file-button">导入图解方案<input disabled={importing} type="file" accept=".json" onChange={e=>{const f=e.target.files?.[0];e.target.value='';if(f)void importFile([f]);}}/></label></FileDrop>
+        {error && <p className="info-error" role="alert">{error}</p>}
+        <div className="info-input-actions"><button className="primary" disabled={importing} onClick={()=>applyManual(JSON.stringify(DIRECTOR_EXAMPLE))}>试用示例</button></div>
+        <details><summary>粘贴或修改方案内容</summary><textarea aria-label="图解方案内容" className="code" rows={12} value={manualJson} onChange={e=>setManualJson(e.target.value)} style={{width:'100%'}}/><button disabled={importing} onClick={()=>applyManual()}>使用此方案</button></details>
+        <details><summary>准备图解方案</summary><p>将示例格式交给ChatGPT或Agent，根据你的稿子编排；导入返回的JSON文件即可。导入和播放不调用付费AI。</p></details>
       </div>
     );
   }
 
   // ---------- 方案 / 预览阶段 ----------
-  const p = plan!;
+  const p = plan!; const rendering=['uploading','waiting','dispatching','downloading'].includes(cloud.phase);
   return (
-    <div>
+    <div className="info-form">
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 14 }}>
         <div className="row">
           <a className="ghost" href="#/tools" style={{ textDecoration: 'none', padding: '4px 12px', fontSize: 13 }}>← 返回素材工具</a>
           <b>文字图解动画 · 动画方案</b>
         </div>
         <div className="row">
-          <button className="ghost" onClick={() => { setPhase('input'); setPlan(null); }}>← 重新输入</button>
-          <button className="ghost" onClick={() => setPhase('input')}>修改方案</button>
-          {phase === 'plan' && <button className="blue" onClick={() => setPhase('preview')}>生成预览 →</button>}
+          <button className="ghost" disabled={rendering} onClick={() => { setPhase('input'); setPlan(null); }}>← 重新输入</button>
+          <button className="ghost" disabled={rendering} onClick={() => {setManualJson(JSON.stringify(plan,null,2));setPhase('input');}}>修改方案</button>
+          {phase === 'plan' && <button className="blue" disabled={!spec} onClick={() => setPhase('preview')}>预览动画 →</button>}
           {phase === 'preview' && (
             <button className="primary"
-              disabled={cloud.phase === 'waiting' || cloud.phase === 'dispatching' || !spec}
-              onClick={() => spec && cloud.run({ spec, fileName: `motion-b-${Date.now()}.mp4` })}>
+              disabled={['uploading','waiting','dispatching','downloading'].includes(cloud.phase) || !spec}
+              onClick={() => spec && cloud.run({ spec, autoDownload:false, compatible:true, fileName: `motion-b-${Date.now()}.mp4` })}>
               生成高清 MP4
             </button>
           )}
         </div>
       </div>
 
+      {built.error && <p className="info-error" role="alert">{built.error}</p>}
       {cloud.phase !== 'idle' && (
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="row">
@@ -101,6 +95,7 @@ export const InfoMotion: React.FC = () => {
         </div>
       )}
 
+      {cloud.videoUrl && <section className="card col" style={{gap:12,marginBottom:20}}><h3>已生成的视频</h3><video controls src={cloud.videoUrl} style={{width:'100%',maxHeight:500}}/><a href={cloud.videoUrl} download={cloud.videoName}>下载 MP4</a></section>}
       <div className="a-layout">
         <div className="col" style={{ gap: 14 }}>
           {phase === 'preview' && spec ? (
@@ -108,11 +103,11 @@ export const InfoMotion: React.FC = () => {
           ) : (
             <div className="card col" style={{ gap: 14 }}>
               <div>
-                <span className="tag">我对这段内容的理解</span>
-                <textarea rows={2} value={p.meaning} onChange={(e) => updatePlan({ meaning: e.target.value })} style={{ width: '100%', marginTop: 8 }} />
+                <span className="tag">内容概述</span>
+                <textarea aria-label="内容概述" rows={2} value={p.meaning} onChange={(e) => updatePlan({ meaning: e.target.value })} style={{ width: '100%', marginTop: 8 }} />
               </div>
               <div className="row">
-                <span className="tag amber">建议结构</span>
+                <span className="tag amber">图解结构</span>
                 {STRUCTURES.map((s) => (
                   <button key={s.key} style={{ padding: '4px 14px', fontSize: 13 }}
                     className={p.primaryStructure === s.key ? 'primary' : 'ghost'}
@@ -125,7 +120,7 @@ export const InfoMotion: React.FC = () => {
                 <span className="tag green">画面内容（可编辑）</span>
                 <div className="row" style={{ alignItems: 'flex-start' }}>
                   <label className="muted" style={{ width: 70 }}>标题</label>
-                  <input style={{ flex: 1 }} value={p.title ?? ''} onChange={(e) => updatePlan({ title: e.target.value })} />
+                  <input aria-label="图解标题" style={{ flex: 1 }} value={p.title ?? ''} onChange={(e) => updatePlan({ title: e.target.value })} />
                 </div>
                 {p.primaryStructure === 'Comparison' && (
                   <>
@@ -199,7 +194,7 @@ export const InfoMotion: React.FC = () => {
           ))}
           <span className="muted">节奏由系统按分镜自动换算成时间；重点画面会自动留阅读时间。</span>
           {phase === 'preview' && (
-            <button className="ghost" onClick={() => setPhase('plan')}>← 返回调整方案</button>
+            <button className="ghost" disabled={rendering} onClick={() => setPhase('plan')}>← 返回调整方案</button>
           )}
         </div>
       </div>

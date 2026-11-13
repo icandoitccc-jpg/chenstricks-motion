@@ -22,6 +22,7 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           ln -s app/node_modules ../node_modules
           npm run test:workflow
+          MOTION_INFO_JOB_OUT=../jobs/info-verified.json npm run test:info
           npm run build
           npm install --no-save --ignore-scripts --no-audit --no-fund playwright
           npx playwright install --with-deps chromium
@@ -37,6 +38,17 @@ jobs:
           cd ..
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4187/ >/dev/null && break || sleep 1; done
           node .github/workflows/project-ui.cjs
+      - name: Verify one information animation MP4
+        if: contains(github.event.head_commit.message, '[check-info-video]')
+        run: |
+          unlink node_modules
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx remotion browser ensure
+          JOB=info-verified node scripts/render.mjs
+          cp out/info-verified/info-verified.mp4 /tmp/qa-evidence/
+          cp out/info-verified/still-*.png /tmp/qa-evidence/
+          cp out/info-verified/metrics.json /tmp/qa-evidence/ || true
+          ffmpeg -v error -i out/info-verified/info-verified.mp4 -f null -
       - name: Stage verified site on publishing branch
         run: |
           git worktree add /tmp/motion-site origin/gh-pages

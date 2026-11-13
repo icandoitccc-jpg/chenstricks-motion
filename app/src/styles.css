@@ -30,7 +30,7 @@ button {
 button:hover { background: var(--panel-strong); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #1a1408; font-weight: 600; }
 button.primary:hover { filter: brightness(1.1); }
-button.blue { background: var(--blue); border-color: var(--blue); color: #0a1524; font-weight: 600; }
+button.blue { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600; }
 button.ghost { background: transparent; }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 input, textarea, select {

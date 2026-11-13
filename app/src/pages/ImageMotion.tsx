@@ -7,6 +7,7 @@ import {
   A_EFFECTS, AAction, AEffectCategory, AItem, AspectKey, ASPECTS,
   buildSpecA, effectByName, Direction, Hold, PRESETS, Relation, Speed, Intensity,
 } from '../lib/spec-builder-a';
+import { FileDrop } from '../components/FileDrop';
 import { PreviewPlayer } from '../components/PreviewPlayer';
 import { useCloudRender } from '../lib/useCloudRender';
 import { sameBlockReasonsForUI } from '../lib/motion-guard';
@@ -52,6 +53,7 @@ function adjustHold(base: Hold, rhythm: Rhythm): Hold {
 }
 
 export const ImageMotion: React.FC = () => {
+  const [uploading,setUploading]=useState(false); const [uploadError,setUploadError]=useState('');
   const [image, setImage] = useState<ImageState | null>(null);
   const [aspect, setAspect] = useState<AspectKey>('16:9');
   const [items, setItems] = useState<AItem[]>([]);
@@ -87,17 +89,22 @@ export const ImageMotion: React.FC = () => {
   const LOW_RES = 1280;
 
   const onUpload = (f: File) => {
-    if (f.size > MAX_SIZE) { alert('图片超过 10MB，请换一张小一点的图片。'); return; }
+    setUploadError('');
+    if (!['image/png','image/jpeg'].includes(f.type)) {setUploadError('请上传 JPG 或 PNG 图片。');return;}
+    if (f.size > MAX_SIZE) { setUploadError('图片超过10MB，请换一张小一点的图片。'); return; }
+    setUploading(true);
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
         setImage({ dataUrl: reader.result as string, w: img.naturalWidth, h: img.naturalHeight });
         setItems([]);
-        setSelected(null);
+        setSelected(null); setUploading(false);
       };
+      img.onerror=()=>{setUploading(false);setUploadError('无法读取这张图片，请换用有效的JPG或PNG。');};
       img.src = reader.result as string;
     };
+    reader.onerror=()=>{setUploading(false);setUploadError('图片读取失败，请重新选择。');};
     reader.readAsDataURL(f);
   };
 
@@ -268,15 +275,16 @@ export const ImageMotion: React.FC = () => {
         </div>
         <h2 className="page-title">图片局部动画</h2>
         <p className="page-sub">上传一张已经完成构图的图片，框选局部区域，让它们按顺序动起来。</p>
-        <div className="card" style={{ maxWidth: 560, textAlign: 'center', padding: 40 }}>
+        <div className="card image-upload-drop" style={{ maxWidth: 560, textAlign: 'center', padding: 40 }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🖼️</div>
           <p className="muted">支持 JPG / PNG，横图、竖图、方图、截图都可以，单张 ≤10MB</p>
           <p className="muted" style={{ fontSize: 12, opacity: 0.7 }}>图片越清晰，导出的视频越清晰</p>
-          <label>
-            <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }}
+          {uploadError && <p role="alert" className="info-error">{uploadError}</p>}
+          <FileDrop label="图片" accept="image/png,image/jpeg" disabled={uploading} onFiles={files=>onUpload(files[0])}><label>
+            <input disabled={uploading} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }}
               onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
             <span className="tag amber" style={{ cursor: 'pointer', padding: '10px 24px', fontSize: 15 }}>选择图片</span>
-          </label>
+          </label></FileDrop>
         </div>
       </div>
     );

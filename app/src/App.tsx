@@ -22,6 +22,7 @@ function useHashRoute(): [string, (p: string) => void] {
 export const App: React.FC = () => {
   const [hash, go] = useHashRoute();
   const [showSettings, setShowSettings] = useState(false);
+  useEffect(()=>{ const prevent=(e:DragEvent)=>{if(Array.from(e.dataTransfer?.types??[]).includes('Files'))e.preventDefault();};window.addEventListener('dragover',prevent);window.addEventListener('drop',prevent);return()=>{window.removeEventListener('dragover',prevent);window.removeEventListener('drop',prevent);};},[]);
 
   let projectId = '';
   try { projectId = hash.startsWith('#/project/') ? decodeURIComponent(hash.slice('#/project/'.length).split('?')[0]) : ''; } catch { /* Invalid URL opens project list instead of crashing. */ }
