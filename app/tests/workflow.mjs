@@ -23,6 +23,7 @@ try {
  assert.throws(()=>m.parseProductionPlan(JSON.stringify(portable),{...p,draftText:'未确认修改'}));
  const timed={...p,sentences:p.sentences.map((s,i)=>({...s,start:i,end:i+1}))};const kept=m.parseProductionPlan(JSON.stringify(portable),timed);assert.equal(kept.sentences[1].end,2);
  const merged={...portable,sentences:[{id:'all',text:p.scriptText,start:null,end:null}],scenes:[{...table.scenes[0],sentenceIds:['all']}]};assert.throws(()=>m.parseProductionPlan(JSON.stringify(merged),timed));assert.equal(m.parseProductionPlan(JSON.stringify(merged),p).sentences.length,1);
+ assert.throws(()=>m.parseProductionPlan(JSON.stringify({...portable,assets:undefined}),p));
  const badOrder={...portable,scenes:[{...portable.scenes[0],sentenceIds:['P1','P0']}]};assert.throws(()=>m.parseProductionPlan(JSON.stringify(badOrder),p));
  for(const patch of [{items:[]},{items:Array(7).fill('过多')},{template:'comparison',items:['只有一项']},{motion:'unsupported'},{focusX:200},{title:'x'.repeat(201)}])assert.throws(()=>m.parseProductionPlan(JSON.stringify({...portable,scenes:[{...portable.scenes[0],...patch}]}),p));
  const draftEdit={...p,draftText:'不同终稿。'};assert(!w.hasDraft(draftEdit));assert(!w.canOpenStep(draftEdit,'scenes'));assert(m.validateProject(draftEdit).some(i=>i.message.includes('终稿')));

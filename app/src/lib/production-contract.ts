@@ -3,6 +3,7 @@ export function checkPortableContract(d: Record<string,unknown>): void {
   const obj=(x:unknown):Record<string,unknown>=>{if(!x||typeof x!=='object'||Array.isArray(x))throw new Error('总表条目必须是对象。');return x as Record<string,unknown>;};
   const id=(x:unknown)=>typeof x==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(x);
   if(d.version!==1)throw new Error('制作总表需要 version: 1。');
+  if(!Array.isArray(d.assets)||d.assets.length>500)throw new Error('总表需要assets素材清单，无素材填空数组，最多500项。');
   if(!Array.isArray(d.sentences)||!d.sentences.length||d.sentences.length>5000)throw new Error('总表需要1—5000个原文单元。');
   const sentenceIds=new Map<string,number>();
   d.sentences.forEach((value,i)=>{const s=obj(value);if(!id(s.id)||sentenceIds.has(s.id as string)||typeof s.text!=='string'||!s.text.trim())throw new Error(`第${i+1}个原文单元需要唯一编号及非空原文。`);sentenceIds.set(s.id as string,i);});
