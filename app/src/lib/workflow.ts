@@ -17,7 +17,8 @@ export function hasPlan(p: Project) { return hasDraft(p) && p.scenes.length > 0 
 export function hasTiming(p: Project) {
   const audio = p.assets.find(a => a.id === p.audioAssetId);
   let end = 0;
-  return !!audio && p.sentences.length > 0 && p.sentences.every(s => {
+  return !!audio && p.sentences.length > 0 && p.sentences.some(s=>!s.omitted) && p.sentences.every(s => {
+    if(s.omitted)return true;
     if (s.start === null || s.end === null || !Number.isFinite(s.start) || !Number.isFinite(s.end) || s.start < end || s.end <= s.start || s.end > (audio.duration ?? 0) + .05) return false;
     end = s.end; return true;
   });

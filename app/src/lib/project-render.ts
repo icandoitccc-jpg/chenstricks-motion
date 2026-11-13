@@ -1,4 +1,4 @@
-import { compileScenes, type Project, type TimedScene } from './project';
+import { captionSentences, compileScenes, type Project, type TimedScene } from './project';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const json = (x: unknown) => JSON.stringify(x).replace(/</g, '\\u003c');
@@ -30,12 +30,12 @@ ${preview ? '' : "@font-face{font-family:MotionChinese;src:url('assets/fonts/Not
 </style></head><body>
 <div id="main" data-composition-id="main" data-start="0" data-duration="${duration}" data-width="${p.width}" data-height="${p.height}" data-fps="${p.fps}">
 <div class="paper"></div>${sceneHtml}
-${p.captions ? p.sentences.filter(s => s.start !== null && s.end !== null).map((s, i) => `<div id="caption-${i}" class="clip caption" data-start="${s.start}" data-duration="${s.end! - s.start!}" data-track-index="3" data-track-kind="captions"><span>${esc(s.text)}</span></div>`).join('') : ''}
+${p.captions ? captionSentences(p).filter(s => s.start !== null && s.end !== null).map((s, i) => `<div id="caption-${i}" class="clip caption" data-start="${s.start}" data-duration="${s.end! - s.start!}" data-track-index="3" data-track-kind="captions"><span>${esc(s.text)}</span></div>`).join('') : ''}
 ${!preview && audio ? `<audio id="narration" class="clip" src="${media(audio.id)}" data-start="0" data-duration="${duration}" data-track-index="2" data-volume="1" preload="metadata"></audio>` : ''}
 </div>
 ${preview ? '' : '<script src="lib/gsap.min.js"></script>'}
 <script>
-const scenes=${json(scenes)},sentences=${json(p.sentences)},isPreview=${preview};
+const scenes=${json(scenes)},sentences=${json(captionSentences(p))},isPreview=${preview};
 let lastTime=0,lastPlaying=false;
 function draw(t,playing){lastTime=t;lastPlaying=playing;
  const active=scenes.find(s=>t>=s.start&&t<s.end)||scenes.filter(s=>s.start<=t).at(-1);

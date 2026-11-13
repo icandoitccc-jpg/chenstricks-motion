@@ -1,14 +1,16 @@
 import { checkPortableContract } from './production-contract';
 export type SceneKind = 'info' | 'image' | 'video';
 export type Template = 'focus' | 'steps' | 'comparison' | 'list';
-export interface Sentence { id: string; text: string; start: number | null; end: number | null }
+export interface Sentence { id: string; text: string; start: number | null; end: number | null; omitted?: boolean }
 export interface MediaAsset { id: string; name: string; kind: 'audio' | 'image' | 'video'; duration?: number; size: number; mime: string }
 export interface Scene {
+  recordingInstructions?: string; fallback?: string; sourceStatus?: string;
   id: string; title: string; sentenceIds: string[]; kind: SceneKind; assetId?: string;
   template: Template; items: string[]; leftLabel: string; rightLabel: string;
   sourceIn: number; motion: 'still' | 'push' | 'pan'; focusX: number; focusY: number;
 }
 export interface Project {
+  transcript?: {audioRevision:number;cues:Sentence[]};
   scriptText?: string; draftText?: string; scriptFileName?: string; scriptRevision?: number; planScriptRevision?: number;
   currentStep?: 'draft' | 'plan' | 'audio' | 'scenes' | 'export';
   version: 1; id: string; title: string; audioRevision: number; audioAssetId?: string;
@@ -20,7 +22,13 @@ export interface Issue { level: 'error' | 'warning'; message: string }
 export const uid = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
 export const newProject = (): Project => ({ version: 1, id: uid('project'), title: '我的视频', audioRevision: 0, width: 1920, height: 1080, fps: 30, captions: true, sentences: [], scenes: [], assets: [] });
 export const newScene = (sentenceIds: string[] = []): Scene => ({ id: uid('scene'), title: '新画面', sentenceIds, kind: 'info', template: 'focus', items: [], leftLabel: '之前', rightLabel: '现在', sourceIn: 0, motion: 'push', focusX: 50, focusY: 50 });
-export const splitScript = (text: string): Sentence[] => (text.match(/[^。！？!?\n]+[。！？!?]?/g) ?? []).map(s => s.trim()).filter(Boolean).map((text, i) => ({ id: `S${String(i + 1).padStart(3, '0')}`, text, start: null, end: null }));
+export const splitScript = (text: string): Sentence[] => {
+ const parts:string[]=[];
+ for(const raw of text.match(/[^。！？!?\n]+[。！？!?]?|[。！？!?]+/g)??[]){const t=raw.trim();if(!t)continue;if(/^[。！？!?]+$/.test(t)&&parts.length)parts[parts.length-1]+=t;else parts.push(t);}
+ return parts.map((text,i)=>({id:`S${String(i+1).padStart(3,'0')}`,text,start:null,end:null}));
+};
+export const sceneOmitted=(p:Project,id:string)=>{const sc=p.scenes.find(s=>s.id===id);return !!sc?.sentenceIds.length&&sc.sentenceIds.every(id=>p.sentences.find(s=>s.id===id)?.omitted===true);};
+export const captionSentences=(p:Project)=>p.transcript?.audioRevision===p.audioRevision?p.transcript.cues:p.sentences.filter(s=>!s.omitted);
 export function formatTime(value: number) {
   if (!Number.isFinite(value)) return '—';
   return `${Math.floor(value / 60).toString().padStart(2, '0')}:${(value % 60).toFixed(2).padStart(5, '0')}`;
@@ -44,7 +52,7 @@ export function parseSrt(text: string): Sentence[] {
 export function compileScenes(p: Project): TimedScene[] {
   const sentences = new Map(p.sentences.map(s => [s.id, s]));
   return p.scenes.flatMap(scene => {
-    const ss = scene.sentenceIds.map(id => sentences.get(id));
+    const ss = scene.sentenceIds.map(id => sentences.get(id)).filter(s=>!s?.omitted);
     if (!ss.length || ss.some(s => !s || s.start === null || s.end === null)) return [];
     return [{ ...scene, start: Math.min(...ss.map(s => s!.start!)), end: Math.max(...ss.map(s => s!.end!)) }];
   }).sort((a, b) => a.start - b.start);
@@ -59,6 +67,7 @@ export function validateProject(p: Project, files?: Map<string, Blob>): Issue[] 
   const seen = new Set<string>(); let lastEnd = 0;
   for (const s of p.sentences) {
     if (seen.has(s.id)) error(`句子编号重复：${s.id}`); seen.add(s.id);
+    if(s.omitted)continue;
     if (s.start === null || s.end === null) { error(`${s.id} 尚未标记实际时间。`); continue; }
     if (!Number.isFinite(s.start) || !Number.isFinite(s.end) || s.start < 0 || s.end <= s.start) error(`${s.id} 时间无效。`);
     if (s.start < lastEnd - 0.001) error(`${s.id} 与上一句时间重叠或顺序错误。`);
@@ -76,6 +85,7 @@ export function validateProject(p: Project, files?: Map<string, Blob>): Issue[] 
     const sorted = [...new Set(indices)].sort((a, b) => a - b);
     if (sorted.length !== indices.length || sorted.some((v, i) => i > 0 && v !== sorted[i - 1] + 1)) error(`${sc.title} 只能绑定一组连续、不重复的句子。`);
     for (const id of sc.sentenceIds) { if (owners.has(id)) error(`${id} 被多个场景重复使用。`); owners.set(id, sc.id); }
+    if(sceneOmitted(p,sc.id))continue;
     if (sc.kind !== 'info') {
       const a = p.assets.find(a => a.id === sc.assetId);
       if (!a || a.kind !== sc.kind) error(`${sc.title} 缺少匹配的${sc.kind === 'image' ? '图片' : '录屏'}素材。`);
@@ -91,7 +101,7 @@ export function validateProject(p: Project, files?: Map<string, Blob>): Issue[] 
   for (const s of p.sentences) if (!owners.has(s.id)) error(`${s.id} 还没有画面。`);
   for (let i = 1; i < timed.length; i++) if (timed[i].start < timed[i - 1].end - 0.001) error('场景时间重叠。');
   if (audio?.duration && timed.length && audio.duration - timed[timed.length - 1].end > 0.5) warning('录音结尾有未分配画面的停留，导出会保持最后一幕。');
-  const used = new Set([p.audioAssetId, ...p.scenes.filter(s => s.kind !== 'info').map(s => s.assetId)].filter(Boolean));
+  const used = new Set([p.audioAssetId, ...p.scenes.filter(s => s.kind !== 'info'&&!sceneOmitted(p,s.id)).map(s => s.assetId)].filter(Boolean));
   if (files) for (const id of used) if (!files.has(id!)) error(`素材文件未连接：${p.assets.find(a => a.id === id)?.name ?? id}`);
   return issues;
 }
@@ -111,7 +121,7 @@ export function parseScenePlan(raw: string, p: Project): Scene[] {
     if (!Array.isArray(v.sentenceIds) || !v.sentenceIds.length || v.sentenceIds.some(id => typeof id !== 'string' || !p.sentences.some(s => s.id === id))) throw new Error(`场景${i + 1}需要有效的 sentenceIds。`);
     const id = str(v.id, s.id); if (!/^[a-zA-Z0-9_-]{1,80}$/.test(id) || ids.has(id)) throw new Error('场景编号无效或重复。'); ids.add(id);
     const template = str(v.template, 'focus'); if (!['focus', 'steps', 'comparison', 'list'].includes(template)) throw new Error(`场景${i + 1}模板尚未实现：${template}`);
-    return { ...s, id, title: str(v.title, s.title).slice(0, 200), sentenceIds: v.sentenceIds as string[], kind: v.kind as SceneKind,
+    return { ...s, recordingInstructions:str(v.recordingInstructions).slice(0,3000)||undefined,fallback:str(v.fallback).slice(0,3000)||undefined,sourceStatus:str(v.sourceStatus).slice(0,1000)||undefined, id, title: str(v.title, s.title).slice(0, 200), sentenceIds: v.sentenceIds as string[], kind: v.kind as SceneKind,
       template: template as Template, items: Array.isArray(v.items) ? v.items.map(x => str(x)).filter(Boolean).slice(0, 20) : [], assetId: str(v.assetId) || undefined,
       leftLabel: str(v.leftLabel, '之前'), rightLabel: str(v.rightLabel, '现在'), sourceIn: number(v.sourceIn, 0), motion: ['still', 'push', 'pan'].includes(String(v.motion)) ? v.motion as Scene['motion'] : 'push', focusX: Math.max(0, Math.min(100, number(v.focusX, 50))), focusY: Math.max(0, Math.min(100, number(v.focusY, 50))) };
   });
@@ -122,11 +132,12 @@ export function parseProject(raw: string): Project {
   if (d.sentences.length > 5000 || d.assets.length > 500 || ![1920, 1080].includes(Number(d.width)) || ![1080, 1920].includes(Number(d.height))) throw new Error('项目规模或画幅不受支持。');
   const p = newProject(); p.id = d.id; p.title = str(d.title, p.title); p.audioRevision = number(d.audioRevision, 0); p.audioAssetId = str(d.audioAssetId) || undefined;
   p.width = Number(d.width); p.height = Number(d.height); p.captions = d.captions !== false;
-  p.sentences = d.sentences.map(x => { const s = record(x); if (typeof s.id !== 'string' || typeof s.text !== 'string') throw new Error('句子格式错误。'); return { id: s.id, text: s.text, start: typeof s.start === 'number' ? number(s.start, -1) : null, end: typeof s.end === 'number' ? number(s.end, -1) : null }; });
+  p.sentences = d.sentences.map(x => { const s = record(x); if (typeof s.id !== 'string' || typeof s.text !== 'string') throw new Error('句子格式错误。'); return { id: s.id, text: s.text, omitted:s.omitted===true, start: typeof s.start === 'number' ? number(s.start, -1) : null, end: typeof s.end === 'number' ? number(s.end, -1) : null }; });
   p.assets = d.assets.map(x => { const a = record(x); if (!/^[a-zA-Z0-9_-]{1,100}$/.test(str(a.id)) || !['audio', 'image', 'video'].includes(str(a.kind))) throw new Error('素材格式错误。'); return { id: str(a.id), name: str(a.name), kind: a.kind as MediaAsset['kind'], size: number(a.size, 0), mime: str(a.mime), duration: typeof a.duration === 'number' ? number(a.duration, 0) : undefined }; });
   p.scriptText = typeof d.scriptText === 'string' ? d.scriptText : undefined; p.draftText = typeof d.draftText === 'string' ? d.draftText : p.scriptText;
   p.scriptFileName = str(d.scriptFileName) || undefined; p.scriptRevision = typeof d.scriptRevision === 'number' ? number(d.scriptRevision, 0) : undefined; p.planScriptRevision = typeof d.planScriptRevision === 'number' ? number(d.planScriptRevision, 0) : undefined;
   p.currentStep = ['draft','plan','audio','scenes','export'].includes(str(d.currentStep)) ? d.currentStep as Project['currentStep'] : undefined;
+  if(d.transcript!==undefined){const t=record(d.transcript);if(typeof t.audioRevision!=='number'||!Array.isArray(t.cues)||t.cues.length>5000)throw new Error('录音字幕格式错误。');let end=0;const duration=p.assets.find(a=>a.id===p.audioAssetId)?.duration??Infinity;p.transcript={audioRevision:t.audioRevision,cues:t.cues.map((v,i)=>{const c=record(v);if(typeof c.text!=='string'||!c.text.trim()||typeof c.start!=='number'||typeof c.end!=='number'||!Number.isFinite(c.start)||!Number.isFinite(c.end)||c.start<end||c.end<=c.start||c.end>duration+.05)throw new Error('录音字幕时间无效。');end=c.end;return {id:`T${i}`,text:c.text,start:c.start,end:c.end};})};}
   p.scenes = d.scenes.length ? parseScenePlan(JSON.stringify({ version: 1, projectId: p.id, audioRevision: p.audioRevision, scenes: d.scenes }), p) : [];
   return p;
 }

@@ -1,3 +1,5 @@
+import { suggestAudioSync, applyAudioSync, type SyncRow } from '../lib/audio-alignment';
+import { AudioSyncReview } from '../components/AudioSyncReview';
 import { AgentHandoff } from '../components/AgentHandoff';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { compileScenes, formatTime, newProject, newScene, parseProductionPlan, pendingAsset, parseSrt, uid, validateProject, type Project, type Scene, type Sentence } from '../lib/project';
@@ -17,6 +19,8 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
   const [project, setProject] = useState<Project>(newProject);
   const [files, setFiles] = useState<Map<string,Blob>>(new Map());
   const [ready, setReady] = useState(false); const [tab, setTab] = useState<ProjectStep>('draft');
+  const [syncDraft,setSyncDraft]=useState<{rows:SyncRow[];cues:Sentence[];base:string}|null>(null);
+  const syncBase=(p:Project)=>JSON.stringify([p.id,p.audioRevision,p.scriptRevision,p.sentences,p.scenes]);
   const [selected, setSelected] = useState('');
   const [time, setTime] = useState(0); const [playing, setPlaying] = useState(false);
   const [notice, setNotice] = useState(''); const [saveStatus, setSaveStatus] = useState('正在读取本机项目…');
@@ -83,6 +87,7 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
         if ([...nextFiles.values()].reduce((sum, blob) => sum + blob.size, 0) + f.size > 100 * 1024 ** 2) throw new Error('首版项目素材总量限100MB，建议先做短片段。');
         nextFiles.set(id, f); next = { ...next, assets: [...next.assets.filter(a => a.id !== id), { id, ...meta }] };
         if (narration) {
+          setSyncDraft(null);
           const changed = next.audioAssetId && next.audioAssetId !== id;
           if (changed) { const old = next.audioAssetId; nextFiles.delete(old!); next = { ...next, assets: next.assets.filter(a => a.id !== old), sentences: next.sentences.map(s => ({ ...s, start: null, end: null })) }; }
           next = { ...next, audioAssetId: id, audioRevision: existing ? next.audioRevision : next.audioRevision + 1 };
@@ -101,8 +106,8 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
     const sentences = parseSrt(await f.text());
     if (project.sentences.length) {
       const normalize = (s: string) => s.replace(/[\s，。！？、；：,.!?;:“”「」\u200b]/g, '');
-      if (sentences.length !== project.sentences.length || sentences.some((s,i)=>normalize(s.text)!==normalize(project.sentences[i].text))) throw new Error('字幕分句或文字与终稿不一致，未覆盖总表。请提供同样分句的实际时间，或手工标记；当前不自动对齐。');
-      update({ sentences: project.sentences.map((s,i)=>({ ...s, start: sentences[i].start, end: sentences[i].end })) });
+      if (sentences.length !== project.sentences.length || sentences.some((s,i)=>normalize(s.text)!==normalize(project.sentences[i].text))) {setSyncDraft({rows:suggestAudioSync(project,sentences),cues:sentences,base:syncBase(project)});setNotice('已按实际字幕生成画面时间建议，请核对后采用。');return;}
+      const duration=project.assets.find(a=>a.id===project.audioAssetId)?.duration??Infinity;if(sentences.some(s=>s.end!>duration+.05))throw new Error('字幕超过当前录音长度。');setSyncDraft(null);update({ sentences: project.sentences.map((s,i)=>({ ...s, omitted:false, start: sentences[i].start, end: sentences[i].end })),transcript:{audioRevision:project.audioRevision,cues:sentences} });
     } else update({ sentences, scenes: [] });
     setNotice(`已导入${sentences.length}句实际时间，保留画面绑定。请试听核对。`);
   };
@@ -176,7 +181,8 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
       {audioMeta && <><p className="draft-filename">{audioMeta.name} · {formatTime(audioMeta.duration??0)}</p><audio ref={audio} controls preload="metadata" src={urls[project.audioAssetId!]} onTimeUpdate={e=>setTime(e.currentTarget.currentTime)}/>
       {!files.has(project.audioAssetId!) && <p role="status">请重新连接这份录音文件。</p>}
       <div className="sync-status"><strong>{hasTiming(project)?'录音时间已匹配':'录音已添加，等待同步'}</strong><FileDrop label=".srt" accept=".srt,.vtt" disabled={busy} onFiles={files=>attempt(()=>importSubtitles(files[0]))}><label className="studio-file-button">导入同步字幕<input type="file" accept=".srt,.vtt" onChange={readFile(importSubtitles)}/></label></FileDrop></div>
-      {!hasTiming(project) && <p className="step-help">当前可导入带时间字幕，或逐句标记录音位置。自动同步尚未接通。</p>}
+      {!hasTiming(project) && <p className="step-help">导入这份最终录音的时间字幕，系统会按内容匹配画面。允许语气词和不同分句；差异较大的地方需试听确认。目前不直接识别音频。</p>}
+      {syncDraft&&<AudioSyncReview key={syncDraft.base+JSON.stringify(syncDraft.cues)} initial={syncDraft.rows} onCancel={()=>setSyncDraft(null)} onListen={t=>{if(audio.current){audio.current.currentTime=t;void audio.current.play();}}} onApply={rows=>void attempt(async()=>{if(syncBase(projectRef.current)!==syncDraft.base)throw new Error('项目或录音已有修改，请重新导入这份录音的字幕。');const next=applyAudioSync(projectRef.current,rows,syncDraft.cues);projectRef.current=next;setProject(next);setSyncDraft(null);clearOutputs();await saveProject(next,filesRef.current,cacheRef.current);setNotice('画面时间已采用，字幕使用实际口播文字，原终稿保持不变。');})}/>}
       <details><summary>调整各句与录音的位置</summary><div className="studio-transcript">{project.sentences.map(s=><div className="studio-sentence" key={s.id}><div className="studio-sentence-id">{s.id}</div><p>{s.text}</p><div className="studio-time-fields"><label>开始（秒）<input aria-label={`${s.id}开始`} type="number" min="0" step=".01" value={s.start??''} onChange={e=>sentenceChange(s.id,{start:e.target.value===''?null:Number(e.target.value)})}/></label><button disabled={!files.has(project.audioAssetId!)} onClick={()=>sentenceChange(s.id,{start:Number(time.toFixed(2))})}>用当前播放位置</button><label>结束（秒）<input aria-label={`${s.id}结束`} type="number" min="0" step=".01" value={s.end??''} onChange={e=>sentenceChange(s.id,{end:e.target.value===''?null:Number(e.target.value)})}/></label><button disabled={!files.has(project.audioAssetId!)} onClick={()=>sentenceChange(s.id,{end:Number(time.toFixed(2))})}>用当前播放位置</button></div></div>)}</div></details>
       </>}
     </section>}

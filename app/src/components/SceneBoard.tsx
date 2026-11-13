@@ -16,6 +16,7 @@ export function SceneBoard({ project, files, selected, busy, generated, onSelect
       <h3>{s.title}</h3><p className="studio-shot-script">{r.text || '尚未关联原文'}</p>
       <small>{s.sentenceIds.join('—') || '未绑定句子'}</small><small>{planning ? '时长在录音步骤确定' : r.timed ? `${formatTime(r.timed.start)} → ${formatTime(r.timed.end)}` : '待匹配录音实际时间'}</small>
       <p className="studio-shot-source">{s.kind === 'info' ? ({ focus: '重点强调', steps: '步骤展开', comparison: '左右对比', list: '逐项解释' }[s.template]) + ' · ' + s.items.join(' / ') : r.asset?.name || '需要补充素材文件'}</p>
+      {(s.recordingInstructions||s.fallback||s.sourceStatus)&&<details className="scene-preparation"><summary>素材准备与替代方案</summary>{s.sourceStatus&&<p>来源状态：{s.sourceStatus}</p>}{s.recordingInstructions&&<p>准备方法：{s.recordingInstructions}</p>}{s.fallback&&<p>替代方案：{s.fallback}</p>}</details>}
       <div className={`studio-shot-state ${r.ready ? 'ready' : ''}`}>{planning ? s.kind==='info'?'已安排':files.has(s.assetId??'')?'素材已连接':'待补素材' : generated.has(s.id) ? '已有分段 MP4' : r.label}</div>
       {!planning && !r.ready && <p className="studio-shot-error" title={r.errors.join('\n')}>{r.errors[0]}{r.errors.length > 1 ? `（另有${r.errors.length - 1}项）` : ''}</p>}
       <div className="studio-shot-actions"><button disabled={busy} onClick={() => onSelect(s.id)}>{planning ? '修改安排' : r.ready ? '预览 / 修改' : '查看 / 补齐'}</button>{!planning && <button disabled={busy || !r.ready} onClick={() => onRender([s.id])}>生成本段 MP4</button>}</div>

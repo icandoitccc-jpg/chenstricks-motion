@@ -22,6 +22,7 @@ export function SceneEditor({ project, scene, onChange, onDelete, onDuplicate }:
         <label>聚焦位置 · 纵向 {scene.focusY}%<input type="range" min="0" max="100" value={scene.focusY} onChange={e => onChange({ focusY: Number(e.target.value) })} /></label>
       </>}
     </>}
+    <details><summary>补录说明与替代方案</summary><label>来源状态<input value={scene.sourceStatus??''} onChange={e=>onChange({sourceStatus:e.target.value})}/></label><label>准备方法<textarea value={scene.recordingInstructions??''} onChange={e=>onChange({recordingInstructions:e.target.value})}/></label><label>替代方案<textarea value={scene.fallback??''} onChange={e=>onChange({fallback:e.target.value})}/></label></details>
     <button onClick={onDuplicate}>复制这一幕（重新绑定句子）</button>
   </section>;
 }

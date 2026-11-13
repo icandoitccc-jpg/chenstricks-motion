@@ -1,4 +1,4 @@
-import { compileScenes, validateProject, type Project, type Scene } from './project';
+import { sceneOmitted, compileScenes, validateProject, type Project, type Scene } from './project';
 
 export function orderedScenes(p: Project): Scene[] {
   const rank = (s: Scene) => Math.min(...s.sentenceIds.map(id => {
@@ -18,6 +18,7 @@ export function sceneProject(p: Project, id: string): Project {
 
 export function sceneReadiness(p: Project, id: string, files: Map<string, Blob>) {
   const part = sceneProject(p, id);
+  if(sceneOmitted(p,id))return {ready:false,errors:[],label:'未朗读，已跳过',text:part.sentences.map(s=>s.text).join(''),asset:undefined,timed:undefined};
   const errors = validateProject(part, files).filter(i => i.level === 'error').map(i => i.message);
   const scene = part.scenes[0];
   // Shared sentence ownership is a real ambiguity even during individual production.
@@ -31,16 +32,19 @@ export function sceneReadiness(p: Project, id: string, files: Map<string, Blob>)
 
 /** Render ranges use the exact same master-audio clock as preview. */
 export function segmentProject(p: Project, id: string) {
-  const part = sceneProject(p, id); const timed = compileScenes(part)[0];
+  const part = sceneProject(p, id);
+ const timed = compileScenes(part)[0];
   if (!timed || timed.end <= timed.start) throw new Error('本段缺少有效实际时间。');
   const start = timed.start; const duration = timed.end - start;
   return { start, duration, project: { ...part,
     title: `${p.title} · ${part.scenes[0].title}`,
     sentences: part.sentences.map(s => ({ ...s, start: s.start! - start, end: s.end! - start })),
+    transcript:p.transcript?{...p.transcript,cues:p.transcript.cues.filter(c=>c.start!==null&&c.end!==null&&c.end>start&&c.start<timed.end).map(c=>({...c,start:Math.max(0,c.start!-start),end:Math.min(duration,c.end!-start)}))}:undefined,
     assets: part.assets.map(a => a.id === p.audioAssetId ? { ...a, duration } : a) } };
 }
 
 export function sceneSignature(p: Project, id: string, files: Map<string, Blob>) {
   const part = sceneProject(p, id);
+
   return JSON.stringify([part, part.assets.map(a => [a.id, files.get(a.id)?.size, (files.get(a.id) as File | undefined)?.lastModified])]);
 }

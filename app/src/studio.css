@@ -23,3 +23,5 @@
 .handoff-options{margin-top:18px}.handoff-options summary,.agent-revise summary,.handoff-preview summary{cursor:pointer;color:#3268ba;font-size:13px}.handoff-options .studio-actions{margin-top:12px}.handoff-preview{margin:12px 0 18px}.handoff-preview ol{max-height:280px;overflow:auto;padding-left:26px;font-size:13px}.agent-revise{margin-bottom:20px}.agent-revise details[open]{padding:18px;background:#fffdf9;border:1px solid #dedfd7;border-radius:10px}
 
 .plan-file-import{font-size:13px;color:#647064}.plan-file-import summary{cursor:pointer}.plan-file-import .studio-actions{margin-top:12px}
+
+.audio-sync-review{margin:24px 0;padding:20px;border:1px solid #d4d8cf;background:#fffdf9;border-radius:12px}.audio-sync-review details{padding:14px 0;border-bottom:1px solid #dedfd7}.audio-sync-review p,.scene-preparation p{font-size:13px;line-height:1.75;overflow-wrap:anywhere}.sync-needs-review summary{color:#98621d;font-weight:600}.scene-preparation{font-size:12px;margin:12px 0}.scene-preparation summary{cursor:pointer;color:#3268ba}.audio-sync-review .studio-actions{margin-bottom:14px}
