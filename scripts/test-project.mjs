@@ -51,5 +51,15 @@ try {
   const delivery = render.projectHtml(p, { audio: 'assets/voice.wav', clip: 'assets/screen.mp4' });
   assert(delivery.includes('data-media-start="12"')); assert(delivery.includes('id="narration"')); assert(delivery.includes('data-duration="9"'));
   const source = await readFile('app/src/lib/project-cloud.ts', 'utf8'); assert(source.includes('if (!meta.private)')); assert(source.includes('head_sha === commit.sha'));
+  // Imported units can partially match local punctuation splitting. Reusing only
+  // matching local Sxxx IDs collided with nonmatching incoming Sxxx IDs.
+  const draft='甲。乙。丙。丁。';
+  const current={...m.newProject(),scriptText:draft,draftText:draft,scriptRevision:1,sentences:m.splitScript(draft)};
+  const portable={version:1,binding:'script',sentences:[{id:'S001',text:'甲。乙。',start:null,end:null},{id:'S002',text:'丙。',start:null,end:null},{id:'S003',text:'丁。',start:null,end:null}],assets:[],scenes:[{...m.newScene(['S001','S002','S003']),items:['重点']}]};
+  const fixed=m.parseProductionPlan(JSON.stringify(portable),current);
+  assert.deepEqual(fixed.sentences.map(s=>s.id),['S001','S002','S003']);
+  assert.deepEqual(fixed.scenes[0].sentenceIds,['S001','S002','S003']);
+  assert.throws(()=>m.parseProductionPlan(JSON.stringify({...portable,sentences:portable.sentences.map((s,i)=>i===1?{...s,id:'S001'}:s)}),current),/编号/);
+  assert.throws(()=>m.parseProductionPlan(JSON.stringify(portable),{...current,sentences:current.sentences.map((s,i)=>({...s,start:i,end:i+1}))}),/已同步/);
   console.log('PASS: SRT validation; exact sentence timing; stale-plan rejection; continuous anchors; missing coverage; source trim limits; project roundtrip; HTML escaping; deterministic scene switch/gap hold; source-time synchronization; cloud private-repository guard.');
 } finally { await rm(dir, { recursive: true, force: true }); }

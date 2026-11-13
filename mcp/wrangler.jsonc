@@ -8,5 +8,21 @@
   "workers_dev": true,
   "observability": {
     "enabled": false
-  }
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "HANDOFFS",
+        "class_name": "HandoffSession"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "handoff-v1",
+      "new_sqlite_classes": [
+        "HandoffSession"
+      ]
+    }
+  ]
 }

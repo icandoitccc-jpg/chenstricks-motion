@@ -143,15 +143,20 @@ export function parseProductionPlan(raw: string, current: Project): Project {
     const incoming=d.sentences.map(x=>record(x));
     if(incoming.some(s=>typeof s.text!=='string'||s.start!==null||s.end!==null)) throw new Error('画面安排总表只规划画面，录音时间请留空，由录音步骤处理。');
     if(norm(incoming.map(s=>s.text).join(''))!==norm(current.scriptText)) throw new Error('制作总表与当前终稿不一致，请按当前终稿重新安排画面。');
+    const incomingIds=new Set<string>();
+    for(const s of incoming){if(typeof s.id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(s.id)||incomingIds.has(s.id))throw new Error('总表原文编号缺失、无效或重复。');incomingIds.add(s.id);}
     let offset=0;const existing=new Map<string,Sentence>();
     for(const sentence of current.sentences){const length=norm(sentence.text).length;existing.set(`${offset}:${offset+length}`,sentence);offset+=length;}
     offset=0;const remap=new Map<string,string>();let changedBoundaries=false;
-    const sentences=incoming.map(s=>{const text=s.text as string,length=norm(text).length,previous=existing.get(`${offset}:${offset+length}`);offset+=length;
+    let sentences=incoming.map(s=>{const text=s.text as string,length=norm(text).length,previous=existing.get(`${offset}:${offset+length}`);offset+=length;
       if(!previous)changedBoundaries=true;
       const id=previous?.id??s.id;remap.set(s.id as string,id as string);
       return {...s,id,start:previous?.start??null,end:previous?.end??null};
     });
     if(changedBoundaries&&current.sentences.some(s=>s.start!==null||s.end!==null)) throw new Error('总表的分句与已同步录音不同，请保留现有分句后重新安排。');
+    // Partial reuse mixes two independent S001… namespaces and can create duplicates.
+    // When untimed boundaries change, keep the incoming namespace as one complete set.
+    if(changedBoundaries){remap.clear();sentences=incoming.map(s=>({...s,id:s.id,start:null,end:null}));}
     if(!Array.isArray(d.scenes)) throw new Error('制作总表缺少画面安排。');
     const scenes=d.scenes.map(x=>{const sc=record(x);return {...sc,sentenceIds:Array.isArray(sc.sentenceIds)?sc.sentenceIds.map(id=>remap.get(id as string)??id):sc.sentenceIds};});
     d={...d,projectId:current.id,audioRevision:current.audioRevision,scriptRevision:current.scriptRevision,sentences,scenes};
