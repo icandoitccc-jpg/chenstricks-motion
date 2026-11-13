@@ -357,8 +357,8 @@ export const ImageMotion: React.FC = () => {
             <div className="card" style={{ marginBottom: 12, padding: '10px 16px' }}>
               <span className="muted">
                 {sel && sel.actions.length === 0
-                  ? '已框选区域 → 在右侧选一个「想让这里怎么动」的效果'
-                  : '继续在图片上框选其他区域，或点击右侧「预览」查看效果'}
+                  ? '已框选区域 → 选择一个「想让这里怎么动」的效果'
+                  : '继续在图片上框选其他区域，或点击「预览」查看效果'}
               </span>
             </div>
           )}
@@ -405,7 +405,7 @@ export const ImageMotion: React.FC = () => {
               )}
             </div>
           </div>
-          <p className="muted" style={{ marginTop: 8 }}>在图片上拖动框选想让它动的区域；点击已有区域可在右侧编辑动作序列。</p>
+          <p className="muted" style={{ marginTop: 8 }}>在图片上拖动框选想让它动的区域；点击已有区域可编辑动作序列。</p>
         </div>
 
         <div className="col" style={{ gap: 14 }}>
