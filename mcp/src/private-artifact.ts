@@ -17,7 +17,7 @@ export async function privateArtifact(request:Request):Promise<Response>{
   if(result.status!==302)throw new Error('暂时无法获取音频产物。');
   const url=new URL(result.headers.get('Location')??'');if(url.protocol!=='https:'||!['.blob.core.windows.net','.actions.githubusercontent.com','.githubusercontent.com','.amazonaws.com'].some(s=>url.hostname.endsWith(s)))throw new Error('产物下载地址不受支持。');
   // Do not forward GitHub authorization to signed artifact-storage URLs.
-  const data=await fetch(url.href,{redirect:'error'});if(!data.ok)throw new Error('音频产物读取失败。');
+  const data=await fetch(url.href,{redirect:'manual'});if(!data.ok)throw new Error('音频产物读取失败。');
   return new Response(data.body,{headers:{...headers,'Content-Type':'application/zip'}});
  }catch(e){return Response.json({error:(e as Error).message},{status:400,headers});}
 }
