@@ -1,0 +1,51 @@
+name: Verify audio rough cut
+on:
+  push:
+    branches: [main]
+    paths: ['audio/**', '.github/workflows/audio-rough-qa.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install free audio tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          pip install --disable-pip-version-check faster-whisper==1.2.1
+      - name: Test decisions and real audio
+        run: |
+          python audio/test_rough.py
+          mkdir -p /tmp/rough-qa
+          ffmpeg -v error -f lavfi -i "flite=text='This is a recording test. Motion makes video scenes.':voice=slt" -ar 16000 /tmp/rough-qa/speech.wav
+          ffmpeg -v error -i /tmp/rough-qa/speech.wav -af 'apad=pad_dur=3' -c:a aac /tmp/rough-qa/input.m4a
+          python audio/rough.py analyze /tmp/rough-qa/input.m4a /tmp/rough-qa/analysis.json
+          python - <<'PY'
+          import json,pathlib
+          p=pathlib.Path('/tmp/rough-qa');a=json.loads((p/'analysis.json').read_text())
+          assert a['cues'] and a['candidates']
+          assert any('test' in c['text'].lower() for c in a['cues'])
+          assert all(c['selected'] is False for c in a['candidates'])
+          (p/'decision.json').write_text(json.dumps({'audioSha256':a['audioSha256'],'selectedIds':[c['id'] for c in a['candidates'] if c['kind']=='pause']}))
+          PY
+          python audio/rough.py cut /tmp/rough-qa/input.m4a /tmp/rough-qa/analysis.json /tmp/rough-qa/decision.json /tmp/rough-qa/result
+          ffmpeg -v error -i /tmp/rough-qa/result/rough-cut.m4a -f null -
+          python - <<'PY'
+          import json,pathlib
+          p=pathlib.Path('/tmp/rough-qa');a=json.loads((p/'analysis.json').read_text());b=json.loads((p/'result/rough-result.json').read_text())
+          assert b['duration']<a['duration']-1
+          assert a['audioSha256']==b['sourceSha256']
+          print(json.dumps({'passed':True,'sourceDuration':a['duration'],'cutDuration':b['duration'],'cues':len(a['cues']),'cuts':len(b['selectedIds'])}))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: motion-audio-rough-qa
+          path: /tmp/rough-qa
+          retention-days: 1
