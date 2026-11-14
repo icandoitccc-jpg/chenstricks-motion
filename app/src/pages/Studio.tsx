@@ -90,7 +90,7 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
         if (narration) {
           setSyncDraft(null);
           const changed = next.audioAssetId && next.audioAssetId !== id;
-          if (changed) { const old = next.audioAssetId; nextFiles.delete(old!); next = { ...next, assets: next.assets.filter(a => a.id !== old), sentences: next.sentences.map(s => ({ ...s, start: null, end: null })) }; }
+          if (changed) { clearOutputs();const old = next.audioAssetId; nextFiles.delete(old!); next = { ...next, assets: next.assets.filter(a => a.id !== old), roughCut: undefined, transcript: undefined, sentences: next.sentences.map(s => ({ ...s, start: null, end: null, omitted: false })) }; }
           next = { ...next, audioAssetId: id, audioRevision: existing ? next.audioRevision : next.audioRevision + 1 };
           audio.current?.pause(); setTime(0); setPlaying(false);
           setNotice(changed ? '已更换录音，旧句子时间已清空；画面绑定保留，请重新对齐。' : '录音已添加。接下来确认各段与录音同步。');
