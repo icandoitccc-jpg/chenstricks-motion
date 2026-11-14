@@ -1,0 +1,54 @@
+name: Motion audio rough cut
+on:
+  push:
+    branches: ['rough-audio-*']
+    paths: ['inputs/job.zip']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audio:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Prepare isolated audio job
+        id: mode
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          mkdir job result
+          python - <<'PY'
+          import zipfile,pathlib,json,os
+          with zipfile.ZipFile('inputs/job.zip') as z:
+              total=0
+              for i in z.infolist():
+                  if i.filename not in ['input.media','analysis.json','decision.json','mode.json']:raise SystemExit('Unexpected input')
+                  total+=i.file_size
+                  if total>60*1024**2:raise SystemExit('Input too large')
+              z.extractall('job')
+          mode=json.loads(pathlib.Path('job/mode.json').read_text())['mode']
+          if mode not in ['analyze','cut']:raise SystemExit('Invalid mode')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('mode='+mode+'\n')
+          PY
+          curl --fail --location --max-time 90 -o rough.py 'https://raw.githubusercontent.com/icandoitccc-jpg/chenstricks-motion/e9bcbdaf55a5063003b46963dd14e1421466582e/audio/rough.py'
+      - name: Install open-source recognizer
+        run: pip install --disable-pip-version-check faster-whisper==1.2.1
+      - name: Find candidates without editing audio
+        if: steps.mode.outputs.mode == 'analyze'
+        run: python rough.py analyze job/input.media result/analysis.json
+      - name: Apply only user-confirmed deletions
+        if: steps.mode.outputs.mode == 'cut'
+        run: python rough.py cut job/input.media job/analysis.json job/decision.json result
+      - name: Recognize final rough audio for synchronization
+        if: steps.mode.outputs.mode == 'cut'
+        continue-on-error: true
+        run: python rough.py analyze result/rough-cut.m4a result/rough-analysis.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: motion-rough-${{ steps.mode.outputs.mode }}
+          path: result/
+          retention-days: 1

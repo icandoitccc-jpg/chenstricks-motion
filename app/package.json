@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test:workflow": "node tests/workflow.mjs && node tests/audio-alignment.mjs",
+    "test:workflow": "node tests/workflow.mjs && node tests/audio-alignment.mjs && node tests/rough-cut.mjs && node tests/private-artifact.mjs",
     "test:info": "node tests/info.mjs"
   },
   "dependencies": {

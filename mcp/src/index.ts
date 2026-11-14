@@ -1,3 +1,4 @@
+import {privateArtifact} from './private-artifact';
 import { createHandoff, route, body, type Env } from './handoff';
 export { HandoffSession } from './handoff';
 import { McpServer } from '@modelcontextprotocol/server';
@@ -40,6 +41,7 @@ const handler=(env:Env)=>createMcpHandler(()=>createServer(env),{route:'/mcp',le
 export default {
   async fetch(request:Request,env:Env,ctx:ExecutionContext){
     const path=new URL(request.url).pathname;
+    if(path==='/private-audio-artifact')return privateArtifact(request);
     if(path==='/mcp'||path==='/mcp/')return handler(env)(request,env,ctx);
     if(path.startsWith('/handoff')){
       const origin=request.headers.get('Origin');
