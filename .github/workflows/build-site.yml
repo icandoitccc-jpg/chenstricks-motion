@@ -26,6 +26,9 @@ jobs:
           npm run build
           npm install --no-save --ignore-scripts --no-audit --no-fund playwright
           if [ "$GITHUB_REF" = 'refs/heads/main' ]; then npx playwright install --with-deps chromium; else npx playwright install chromium; fi
+          mkdir -p "$HOME/.local/share/fonts"
+          curl --fail --location --retry 2 --max-time 90 -o "$HOME/.local/share/fonts/NotoSansSC.ttf" 'https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf'
+          fc-cache -f
       - name: Check the built application
         env:
           QA_MODULES: ${{ github.workspace }}/app/node_modules
