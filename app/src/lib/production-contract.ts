@@ -1,3 +1,4 @@
+import {parseImageLayers} from './image-layers';
 /** Portable planning contract v1. Planning only: no inferred recording times. */
 export function checkPortableContract(d: Record<string,unknown>): void {
   const obj=(x:unknown):Record<string,unknown>=>{if(!x||typeof x!=='object'||Array.isArray(x))throw new Error('总表条目必须是对象。');return x as Record<string,unknown>;};
@@ -23,6 +24,7 @@ export function checkPortableContract(d: Record<string,unknown>): void {
       if(s.template==='comparison'&&s.items.length!==2)throw new Error(`${label}对比图必须恰好两项。`);
       if(s.template==='comparison'&&(typeof s.leftLabel!=='string'||!s.leftLabel.trim()||typeof s.rightLabel!=='string'||!s.rightLabel.trim()))throw new Error(`${label}对比图需要左右标签。`);
     }
+    if(s.layers!==undefined){if(s.kind!=='image')throw new Error('图片元素只支持image画面。');parseImageLayers(s.layers);}
     if(!['still','push','pan'].includes(String(s.motion)))throw new Error(`${label}图片动效只支持still、push、pan。`);
     if(typeof s.sourceIn!=='number'||!Number.isFinite(s.sourceIn)||s.sourceIn<0)throw new Error(`${label}素材入点必须为非负秒数，无素材填0。`);
     for(const key of ['focusX','focusY'])if(typeof s[key]!=='number'||!Number.isFinite(s[key])||(s[key] as number)<0||(s[key] as number)>100)throw new Error(`${label}的${key}必须在0—100之间。`);

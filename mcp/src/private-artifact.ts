@@ -12,7 +12,7 @@ export async function privateArtifact(request:Request):Promise<Response>{
   const base='https://api.github.com/repos/'+REPO;const meta=await fetch(base,{headers:gh});if(!meta.ok)return Response.json({error:'无法访问你的私有仓库。'},{status:meta.status,headers});
   if(!(await meta.json() as {private:boolean}).private)throw new Error('已阻止读取公开仓库。');
   const ar=await fetch(base+'/actions/artifacts/'+body.artifactId,{headers:gh});if(!ar.ok)throw new Error('音频任务产物不存在或无权读取。');
-  const artifact=await ar.json() as {name:string;size_in_bytes:number;expired:boolean};if(!['motion-rough-analyze','motion-rough-cut'].includes(artifact.name)||artifact.expired||artifact.size_in_bytes>100*1024**2)throw new Error('不是可读取的粗剪产物。');
+  const artifact=await ar.json() as {name:string;size_in_bytes:number;expired:boolean};if(!['motion-rough-analyze','motion-rough-cut','motion-video'].includes(artifact.name)||artifact.expired||artifact.size_in_bytes>100*1024**2)throw new Error('不是可读取的Motion产物。');
   const result=await fetch(base+'/actions/artifacts/'+body.artifactId+'/zip',{headers:gh,redirect:'manual'});
   if(result.status!==302)throw new Error('暂时无法获取音频产物。');
   const url=new URL(result.headers.get('Location')??'');if(url.protocol!=='https:'||!['.blob.core.windows.net','.actions.githubusercontent.com','.githubusercontent.com','.amazonaws.com'].some(s=>url.hostname.endsWith(s)))throw new Error('产物下载地址不受支持。');

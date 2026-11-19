@@ -2,7 +2,7 @@ import React, {useEffect,useState,useRef} from 'react';
 import {parseProductionPlan,type Project} from '../lib/project';
 const BASE='https://motion-guides.chens-tricks.workers.dev';
 interface Link {ownerKey:string;accessKey:string;expires:number;revision:number;base:string}
-const snapshot=(p:Project)=>JSON.stringify([p.id,p.scriptText,p.draftText,p.scriptRevision,p.audioRevision,p.sentences,p.scenes,p.assets]);
+const snapshot=(p:Project)=>JSON.stringify([p.id,p.visualStyle,p.scriptText,p.draftText,p.scriptRevision,p.audioRevision,p.sentences,p.scenes,p.assets]);
 async function request(path:string,key?:string,data?:unknown){const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json',...(key?{Authorization:'Bearer '+key}:{})},body:JSON.stringify(data??{})});const d=await r.json();if(!r.ok)throw Object.assign(new Error(d.error??'交接暂时不可用。'),{status:r.status});return d;}
 export const AgentHandoff:React.FC<{project:Project;onApply:(p:Project)=>Promise<void>}>=({project,onApply})=>{
  const storageKey='motion.handoff.'+project.id;

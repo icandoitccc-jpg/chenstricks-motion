@@ -1,0 +1,58 @@
+name: Verify image layers MP4
+on:
+  push:
+    branches: [main]
+    paths: ['app/src/lib/image-layers.ts', 'app/src/lib/project-render.ts', 'app/tests/image-layers.mjs', '.github/workflows/image-layers-qa.yml']
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepare synthetic layered scene
+        run: |
+          npm ci --prefix app --ignore-scripts --no-audit --no-fund
+          ln -s app/node_modules node_modules
+          cd app
+          MOTION_LAYER_OUT=/tmp/motion-layers node tests/image-layers.mjs
+      - name: Install free renderer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-noto-cjk python3-pil
+          npm install --prefix /tmp/motion-layer-render --no-audit --no-fund hyperframes@0.9.33 gsap@3.13.0
+          mkdir -p /tmp/motion-layers/lib /tmp/motion-layers/assets/fonts
+          cp /tmp/motion-layer-render/node_modules/gsap/dist/gsap.min.js /tmp/motion-layers/lib/
+          curl --fail --location --retry 2 --max-time 90 -o /tmp/motion-layers/assets/fonts/NotoSansSC.ttf 'https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf'
+      - name: Render actual MP4 and verify movement
+        working-directory: /tmp/motion-layers
+        env:
+          DO_NOT_TRACK: '1'
+        run: |
+          /tmp/motion-layer-render/node_modules/.bin/hyperframes render --quality draft -o layers.mp4
+          ffmpeg -v error -i layers.mp4 -f null -
+          ffmpeg -v error -ss 1.2 -i layers.mp4 -frames:v 1 early.png
+          ffmpeg -v error -ss 3.2 -i layers.mp4 -frames:v 1 later.png
+          python3 - <<'PY'
+          import json,subprocess
+          from PIL import Image
+          def centroid(path):
+              im=Image.open(path).convert('RGB');coords=[x for y in range(180,720) for x in range(im.width) if (lambda p:p[2]>150 and p[0]<120 and p[1]<180)(im.getpixel((x,y)))]
+              assert len(coords)>100, 'No moving image pixels'
+              return sum(coords)/len(coords)
+          a,b=centroid('early.png'),centroid('later.png');assert b-a>500,(a,b)
+          duration=float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=nw=1:nk=1','layers.mp4']))
+          assert abs(duration-4)<.2
+          result={'passed':True,'duration':duration,'earlyX':a,'laterX':b,'movementPixels':b-a}
+          open('verification.json','w').write(json.dumps(result));print(json.dumps(result))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: motion-image-layers-qa
+          path: /tmp/motion-layers/
+          retention-days: 1
