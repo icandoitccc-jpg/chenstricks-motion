@@ -1,7 +1,7 @@
 name: Verify image layers MP4
 on:
   push:
-    branches: [main]
+    branches: [main, feature/image-layers]
     paths: ['app/src/lib/image-layers.ts', 'app/src/lib/project-render.ts', 'app/tests/image-layers.mjs', '.github/workflows/image-layers-qa.yml']
 permissions:
   contents: read
