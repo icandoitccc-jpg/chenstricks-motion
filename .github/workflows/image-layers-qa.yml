@@ -22,10 +22,11 @@ jobs:
           MOTION_LAYER_OUT=/tmp/motion-layers node tests/image-layers.mjs
       - name: Install free renderer
         run: |
-          command -v ffmpeg
-          command -v ffprobe python3-pil
-          npm install --prefix /tmp/motion-layer-render --no-audit --no-fund hyperframes@0.9.33 gsap@3.13.0
-          mkdir -p /tmp/motion-layers/lib /tmp/motion-layers/assets/fonts
+          npm install --prefix /tmp/motion-layer-render --no-audit --no-fund hyperframes@0.9.33 gsap@3.13.0 ffmpeg-static ffprobe-static
+          mkdir -p /tmp/motion-layer-bin /tmp/motion-layers/lib /tmp/motion-layers/assets/fonts
+          ln -s /tmp/motion-layer-render/node_modules/ffmpeg-static/ffmpeg /tmp/motion-layer-bin/ffmpeg
+          ln -s /tmp/motion-layer-render/node_modules/ffprobe-static/bin/linux/x64/ffprobe /tmp/motion-layer-bin/ffprobe
+          echo '/tmp/motion-layer-bin' >> "$GITHUB_PATH"
           cp /tmp/motion-layer-render/node_modules/gsap/dist/gsap.min.js /tmp/motion-layers/lib/
           curl --fail --location --retry 2 --max-time 90 -o /tmp/motion-layers/assets/fonts/NotoSansSC.ttf 'https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf'
       - name: Render actual MP4 and verify movement
