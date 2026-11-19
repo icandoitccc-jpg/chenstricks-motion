@@ -5,9 +5,9 @@
     {
       "id": "production-planning",
       "title": "视频画面策划",
-      "version": "0.1.4",
+      "version": "0.2.0",
       "kind": "guide",
-      "summary": "供 ChatGPT、Codex、WorkBuddy 编排可导入的制作总表。包含交接格式、能力边界与验收规则。",
+      "summary": "视频画面策划、统一配图风格、背景与透明元素动画、交接格式及验收规则。",
       "path": "motion-agent-guide.md"
     },
     {
