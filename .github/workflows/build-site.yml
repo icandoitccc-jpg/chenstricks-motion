@@ -25,7 +25,7 @@ jobs:
           MOTION_INFO_JOB_OUT=../jobs/info-verified.json npm run test:info
           npm run build
           npm install --no-save --ignore-scripts --no-audit --no-fund playwright
-          npx playwright install --with-deps chromium
+          if [ "$GITHUB_REF" = 'refs/heads/main' ]; then npx playwright install --with-deps chromium; else npx playwright install chromium; fi
       - name: Check the built application
         env:
           QA_MODULES: ${{ github.workspace }}/app/node_modules

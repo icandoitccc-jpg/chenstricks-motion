@@ -22,8 +22,8 @@ jobs:
           MOTION_LAYER_OUT=/tmp/motion-layers node tests/image-layers.mjs
       - name: Install free renderer
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg fonts-noto-cjk python3-pil
+          command -v ffmpeg
+          command -v ffprobe python3-pil
           npm install --prefix /tmp/motion-layer-render --no-audit --no-fund hyperframes@0.9.33 gsap@3.13.0
           mkdir -p /tmp/motion-layers/lib /tmp/motion-layers/assets/fonts
           cp /tmp/motion-layer-render/node_modules/gsap/dist/gsap.min.js /tmp/motion-layers/lib/
@@ -39,9 +39,10 @@ jobs:
           ffmpeg -v error -ss 3.2 -i layers.mp4 -frames:v 1 later.png
           python3 - <<'PY'
           import json,subprocess
-          from PIL import Image
+          width,height=map(int,subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0','-show_entries','stream=width,height','-of','csv=p=0:s=x','layers.mp4']).decode().strip().split('x'))
           def centroid(path):
-              im=Image.open(path).convert('RGB');coords=[x for y in range(180,720) for x in range(im.width) if (lambda p:p[2]>150 and p[0]<120 and p[1]<180)(im.getpixel((x,y)))]
+              data=subprocess.check_output(['ffmpeg','-v','error','-i',path,'-f','rawvideo','-pix_fmt','rgb24','-'])
+              coords=[x for y in range(min(180,height),min(720,height)) for x in range(width) if (lambda p:p[2]>150 and p[0]<120 and p[1]<180)(data[(y*width+x)*3:(y*width+x)*3+3])]
               assert len(coords)>100, 'No moving image pixels'
               return sum(coords)/len(coords)
           a,b=centroid('early.png'),centroid('later.png');assert b-a>500,(a,b)
