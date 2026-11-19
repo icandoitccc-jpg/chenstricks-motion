@@ -1,7 +1,7 @@
 name: Build and check Motion site
 on:
   push:
-    branches: [main]
+    branches: [main, feature/image-layers]
     paths: ['app/**', '.github/workflows/build-site.yml', '.github/workflows/project-ui.cjs']
 permissions:
   contents: write
@@ -25,7 +25,10 @@ jobs:
           MOTION_INFO_JOB_OUT=../jobs/info-verified.json npm run test:info
           npm run build
           npm install --no-save --ignore-scripts --no-audit --no-fund playwright
-          npx playwright install --with-deps chromium
+          if [ "$GITHUB_REF" = 'refs/heads/main' ]; then npx playwright install --with-deps chromium; else npx playwright install chromium; fi
+          mkdir -p "$HOME/.local/share/fonts"
+          curl --fail --location --retry 2 --max-time 90 -o "$HOME/.local/share/fonts/NotoSansSC.ttf" 'https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf'
+          fc-cache -f
       - name: Check the built application
         env:
           QA_MODULES: ${{ github.workspace }}/app/node_modules
@@ -39,6 +42,7 @@ jobs:
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4187/ >/dev/null && break || sleep 1; done
           node .github/workflows/project-ui.cjs
       - name: Stage verified site on publishing branch
+        if: github.ref == 'refs/heads/main'
         run: |
           git worktree add /tmp/motion-site origin/gh-pages
           rsync -a --delete --exclude=.git --exclude=uploads/ app/dist/ /tmp/motion-site/

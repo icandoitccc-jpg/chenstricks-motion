@@ -1,0 +1,5 @@
+import type {Project} from './project';
+export function imageTasks(p:Project){
+ const media=new Map(p.assets.map(a=>[a.id,a]));
+ return ['# Motion 配图任务清单',`项目：${p.title}`,'','## 全片统一风格',p.visualStyle?.trim()||'尚未填写：先确认一张风格样板，再按同一参考图制作后续素材。','','图片生成在ChatGPT等外部工具完成；Motion不调用付费生图接口。背景与可移动元素分别交付；元素使用透明PNG，关键文字由Motion文字元素排版。不要把整个动画过程烘焙成一张图。','现有素材编号：',...p.assets.filter(a=>a.kind==='image').map(a=>`- ${a.id}：${a.name}`),'',...p.scenes.filter(s=>s.kind==='image').flatMap((s,i)=>[ `## ${i+1}. ${s.title}`,`场景编号：${s.id}`,`对应原文：${p.sentences.filter(n=>s.sentenceIds.includes(n.id)).map(n=>n.text).join('')}`,`画面变化：${s.visualBrief||'待策划：先出现什么、随后如何变化、最后停在哪里。'}`,`背景文件：${media.get(s.assetId??'')?.name??'待补背景图片'}`,`背景素材编号：${s.assetId??'尚未指定'}`,`背景提示词：${s.imagePrompt||'待补：遵循全片风格，留出独立元素的位置。'}`, ...(s.layers??[]).map(l=>l.kind==='image'?`- 元素「${l.label}」；文件：${media.get(l.assetId??'')?.name??'待补'}；素材编号：${l.assetId}；提示词：${l.prompt||l.label}；要求：透明背景PNG，主体完整，不含外部留白框。`:`- 程序文字「${l.text}」，不用生图写字。`),''])].join('\n');
+}

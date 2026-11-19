@@ -1,3 +1,4 @@
+import {sceneMediaIds} from './image-layers';
 import { sceneOmitted, compileScenes, validateProject, type Project, type Scene } from './project';
 
 export function orderedScenes(p: Project): Scene[] {
@@ -13,7 +14,7 @@ export function sceneProject(p: Project, id: string): Project {
   const scene = p.scenes.find(s => s.id === id);
   if (!scene) throw new Error('找不到这个画面。');
   return { ...p, scenes: [scene], sentences: p.sentences.filter(s => scene.sentenceIds.includes(s.id)),
-    assets: p.assets.filter(a => a.id === p.audioAssetId || a.id === scene.assetId) };
+    assets: p.assets.filter(a => a.id === p.audioAssetId || sceneMediaIds(scene).includes(a.id)) };
 }
 
 export function sceneReadiness(p: Project, id: string, files: Map<string, Blob>) {
@@ -26,7 +27,7 @@ export function sceneReadiness(p: Project, id: string, files: Map<string, Blob>)
   const timed = compileScenes(part)[0];
   return { ready: errors.length === 0, errors, timed,
     text: part.sentences.map(s => s.text).join(''),
-    asset: part.assets.find(a => a.id === scene.assetId),
+    asset: part.assets.find(a => sceneMediaIds(scene).includes(a.id)),
     label: errors.length === 0 ? '可同步预览 / 制作' : errors.some(e => /素材|录屏|图片|文件/.test(e)) ? '待补素材' : '待补时间或指令' };
 }
 

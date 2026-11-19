@@ -34,7 +34,7 @@ export const SettingsModal: React.FC<{ onClose: () => void; githubOnly?: boolean
         <div className="col" style={{ gap: 16 }}>
           <div className="col">
             <b>GitHub Token（云端渲染必填）</b>
-            <span className="muted">需要 classic token，勾选 <code>repo</code> + <code>workflow</code>。只存在本机浏览器，用于触发渲染和下载 MP4。</span>
+            <span className="muted">建议使用仅授权私有渲染仓库的细粒度 Token：Contents 和 Workflows 读写，Actions 只读。用于粗剪及渲染；保存在当前浏览器。</span>
             <input type="password" value={pat} onChange={(e) => setPatV(e.target.value)} placeholder="ghp_..." />
           </div>
           {!githubOnly && <div className="col">

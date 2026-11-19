@@ -88,6 +88,7 @@ export async function renderProjectCloud(zip: Blob, repoName: string, onProgress
   const meta = await api<{ private: boolean; default_branch: string }>(repo);
   if (!meta.private) throw new Error('已阻止上传：此仓库是公开的。请在 GitHub 创建私有仓库（勾选添加 README），再填写仓库名。');
   if (signal.aborted) throw new Error('已取消。');
+  if(user.login+'/'+repoName!=='icandoitccc-jpg/motion-render-private')throw new Error('当前成片回传仅连接已配置的motion-render-private私有仓库。');
   const branch = meta.default_branch;
   const workflowPath = `${repo}/contents/.github/workflows/motion-project.yml`;
   let current: { sha: string; content: string } | undefined;
@@ -119,7 +120,7 @@ export async function renderProjectCloud(zip: Blob, repoName: string, onProgress
       const data = await api<{ artifacts: { id: number; name: string; expired: boolean }[] }>(`${repo}/actions/runs/${run.id}/artifacts`); const art = data.artifacts.find(a => a.name === 'motion-video' && !a.expired);
       if (!art) throw new Error(`任务结束但未找到 MP4：${run.html_url}`);
       onProgress('读取成片用于页面播放，不自动下载…');
-      const r = await fetch(`https://api.github.com${repo}/actions/artifacts/${art.id}/zip`, { headers: { Authorization: `Bearer ${getPat()}`, Accept: 'application/vnd.github+json' } });
+      const r = await fetch('https://motion-guides.chens-tricks.workers.dev/private-audio-artifact', {method:'POST',signal,headers:{Authorization:`Bearer ${getPat()}`,'Content-Type':'application/json'},body:JSON.stringify({repo:user.login+'/'+repoName,artifactId:art.id})});
       if (!r.ok) throw new Error(`浏览器未能下载产物，请从任务页面下载：${run.html_url}`);
       const z = await JSZip.loadAsync(await r.arrayBuffer()); const f = Object.values(z.files).find(f => f.name.endsWith('.mp4'));
       if (!f) throw new Error('产物中缺少 MP4。'); const blob = await f.async('blob'); return { blob: blob.slice(0, blob.size, 'video/mp4'), runUrl: run.html_url };

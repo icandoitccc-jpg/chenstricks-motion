@@ -1,3 +1,4 @@
+import {parseImageLayers,sceneMediaIds,type ImageLayer} from './image-layers';
 import {parseRoughAnalysis,roughIntervals,type RoughState} from './rough-cut';
 import { checkPortableContract } from './production-contract';
 export type SceneKind = 'info' | 'image' | 'video';
@@ -5,12 +6,14 @@ export type Template = 'focus' | 'steps' | 'comparison' | 'list';
 export interface Sentence { id: string; text: string; start: number | null; end: number | null; omitted?: boolean }
 export interface MediaAsset { id: string; name: string; kind: 'audio' | 'image' | 'video'; duration?: number; size: number; mime: string }
 export interface Scene {
+  layers?:ImageLayer[]; visualBrief?:string; imagePrompt?:string;
   recordingInstructions?: string; fallback?: string; sourceStatus?: string;
   id: string; title: string; sentenceIds: string[]; kind: SceneKind; assetId?: string;
   template: Template; items: string[]; leftLabel: string; rightLabel: string;
   sourceIn: number; motion: 'still' | 'push' | 'pan'; focusX: number; focusY: number;
 }
 export interface Project {
+  visualStyle?:string;
   roughCut?:RoughState;
   transcript?: {audioRevision:number;cues:Sentence[]};
   scriptText?: string; draftText?: string; scriptFileName?: string; scriptRevision?: number; planScriptRevision?: number;
@@ -88,6 +91,9 @@ export function validateProject(p: Project, files?: Map<string, Blob>): Issue[] 
     if (sorted.length !== indices.length || sorted.some((v, i) => i > 0 && v !== sorted[i - 1] + 1)) error(`${sc.title} 只能绑定一组连续、不重复的句子。`);
     for (const id of sc.sentenceIds) { if (owners.has(id)) error(`${id} 被多个场景重复使用。`); owners.set(id, sc.id); }
     if(sceneOmitted(p,sc.id))continue;
+    if(sc.layers?.length&&sc.kind!=='image')error(sc.title+'的图片元素只支持image画面。');
+    try{parseImageLayers(sc.layers);}catch(e){error(sc.title+'：'+(e as Error).message);}
+    for(const l of sc.layers??[])if(l.kind==='image'&&!p.assets.some(a=>a.id===l.assetId&&a.kind==='image'))error(sc.title+'缺少元素图片：'+l.label);
     if (sc.kind !== 'info') {
       const a = p.assets.find(a => a.id === sc.assetId);
       if (!a || a.kind !== sc.kind) error(`${sc.title} 缺少匹配的${sc.kind === 'image' ? '图片' : '录屏'}素材。`);
@@ -103,7 +109,7 @@ export function validateProject(p: Project, files?: Map<string, Blob>): Issue[] 
   for (const s of p.sentences) if (!owners.has(s.id)) error(`${s.id} 还没有画面。`);
   for (let i = 1; i < timed.length; i++) if (timed[i].start < timed[i - 1].end - 0.001) error('场景时间重叠。');
   if (audio?.duration && timed.length && audio.duration - timed[timed.length - 1].end > 0.5) warning('录音结尾有未分配画面的停留，导出会保持最后一幕。');
-  const used = new Set([p.audioAssetId, ...p.scenes.filter(s => s.kind !== 'info'&&!sceneOmitted(p,s.id)).map(s => s.assetId)].filter(Boolean));
+  const used = new Set([p.audioAssetId, ...p.scenes.filter(s=>!sceneOmitted(p,s.id)).flatMap(sceneMediaIds)].filter(Boolean));
   if (files) for (const id of used) if (!files.has(id!)) error(`素材文件未连接：${p.assets.find(a => a.id === id)?.name ?? id}`);
   return issues;
 }
@@ -121,9 +127,10 @@ export function parseScenePlan(raw: string, p: Project): Scene[] {
     const v = record(value); const s = newScene();
     if (!['info', 'image', 'video'].includes(String(v.kind))) throw new Error(`场景${i + 1}的 kind 不受支持。`);
     if (!Array.isArray(v.sentenceIds) || !v.sentenceIds.length || v.sentenceIds.some(id => typeof id !== 'string' || !p.sentences.some(s => s.id === id))) throw new Error(`场景${i + 1}需要有效的 sentenceIds。`);
+    if(v.layers!==undefined&&v.kind!=='image')throw new Error('图片元素只能用于image画面。');
     const id = str(v.id, s.id); if (!/^[a-zA-Z0-9_-]{1,80}$/.test(id) || ids.has(id)) throw new Error('场景编号无效或重复。'); ids.add(id);
     const template = str(v.template, 'focus'); if (!['focus', 'steps', 'comparison', 'list'].includes(template)) throw new Error(`场景${i + 1}模板尚未实现：${template}`);
-    return { ...s, recordingInstructions:str(v.recordingInstructions).slice(0,3000)||undefined,fallback:str(v.fallback).slice(0,3000)||undefined,sourceStatus:str(v.sourceStatus).slice(0,1000)||undefined, id, title: str(v.title, s.title).slice(0, 200), sentenceIds: v.sentenceIds as string[], kind: v.kind as SceneKind,
+    return { ...s, layers:v.layers===undefined?undefined:parseImageLayers(v.layers),visualBrief:str(v.visualBrief).slice(0,3000)||undefined,imagePrompt:str(v.imagePrompt).slice(0,6000)||undefined, recordingInstructions:str(v.recordingInstructions).slice(0,3000)||undefined,fallback:str(v.fallback).slice(0,3000)||undefined,sourceStatus:str(v.sourceStatus).slice(0,1000)||undefined, id, title: str(v.title, s.title).slice(0, 200), sentenceIds: v.sentenceIds as string[], kind: v.kind as SceneKind,
       template: template as Template, items: Array.isArray(v.items) ? v.items.map(x => str(x)).filter(Boolean).slice(0, 20) : [], assetId: str(v.assetId) || undefined,
       leftLabel: str(v.leftLabel, '之前'), rightLabel: str(v.rightLabel, '现在'), sourceIn: number(v.sourceIn, 0), motion: ['still', 'push', 'pan'].includes(String(v.motion)) ? v.motion as Scene['motion'] : 'push', focusX: Math.max(0, Math.min(100, number(v.focusX, 50))), focusY: Math.max(0, Math.min(100, number(v.focusY, 50))) };
   });
@@ -133,6 +140,7 @@ export function parseProject(raw: string): Project {
   if (d.version !== 1 || typeof d.id !== 'string' || !Array.isArray(d.sentences) || !Array.isArray(d.assets) || !Array.isArray(d.scenes)) throw new Error('不是受支持的 Motion 项目。');
   if (d.sentences.length > 5000 || d.assets.length > 500 || ![1920, 1080].includes(Number(d.width)) || ![1080, 1920].includes(Number(d.height))) throw new Error('项目规模或画幅不受支持。');
   const p = newProject(); p.id = d.id; p.title = str(d.title, p.title); p.audioRevision = number(d.audioRevision, 0); p.audioAssetId = str(d.audioAssetId) || undefined;
+  p.visualStyle=typeof d.visualStyle==='string'?d.visualStyle.slice(0,6000):undefined;
   p.width = Number(d.width); p.height = Number(d.height); p.captions = d.captions !== false;
   p.sentences = d.sentences.map(x => { const s = record(x); if (typeof s.id !== 'string' || typeof s.text !== 'string') throw new Error('句子格式错误。'); return { id: s.id, text: s.text, omitted:s.omitted===true, start: typeof s.start === 'number' ? number(s.start, -1) : null, end: typeof s.end === 'number' ? number(s.end, -1) : null }; });
   p.assets = d.assets.map(x => { const a = record(x); if (!/^[a-zA-Z0-9_-]{1,100}$/.test(str(a.id)) || !['audio', 'image', 'video'].includes(str(a.kind))) throw new Error('素材格式错误。'); return { id: str(a.id), name: str(a.name), kind: a.kind as MediaAsset['kind'], size: number(a.size, 0), mime: str(a.mime), duration: typeof a.duration === 'number' ? number(a.duration, 0) : undefined }; });
@@ -207,12 +215,15 @@ export function parseProductionPlan(raw: string, current: Project): Project {
       if (!existing) p.assets.push({ id, name, kind: kind as 'image'|'video', size: 0, mime: '' });
     }
   }
+  if(d.visualStyle!==undefined){if(typeof d.visualStyle!=='string'||d.visualStyle.length>6000)throw new Error('画面风格格式无效。');p.visualStyle=d.visualStyle;}
   p.scenes = parseScenePlan(raw, p);
   const ownership = new Set<string>();
   for (const sc of p.scenes) {
     const indices = sc.sentenceIds.map(id => p.sentences.findIndex(s => s.id === id)).sort((a,b)=>a-b);
     if (indices.some((n,i) => i > 0 && n !== indices[i-1]+1)) throw new Error(`${sc.title}只能覆盖连续原文。`);
     for (const id of sc.sentenceIds) { if (ownership.has(id)) throw new Error(`${id}重复安排画面。`); ownership.add(id); }
+    if(sc.layers?.length&&sc.kind!=='image')throw new Error('图片元素只能用于image画面。');
+    for(const layer of sc.layers??[])if(layer.kind==='image'&&!p.assets.some(a=>a.id===layer.assetId&&a.kind==='image'))throw new Error('元素图片必须列在assets中。');
     if (sc.kind !== 'info' && !p.assets.some(a => a.id === sc.assetId && a.kind === sc.kind)) throw new Error(`${sc.title}的素材必须列在assets中，含真实或待录制的文件名。`);
   }
   if (p.sentences.some(s => !ownership.has(s.id))) throw new Error('总表有原文未安排画面，请补齐后导入。');

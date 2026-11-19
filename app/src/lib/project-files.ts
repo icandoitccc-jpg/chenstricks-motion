@@ -119,6 +119,7 @@ export async function readProjectZip(file: File): Promise<StoredProject> {
 export function planningPacket(p: Project) {
   return `# Motion 视频制作资料
 这是给ChatGPT的输入。请返回一份可直接导入的视频制作总表JSON，不要另造格式。
+全片视觉风格: ${p.visualStyle??'尚未填写'}
 projectId: ${p.id}
 audioRevision: ${p.audioRevision}
 scriptRevision: ${p.scriptRevision ?? 0}
