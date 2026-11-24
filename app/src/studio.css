@@ -46,3 +46,5 @@
 @media(max-width:550px){.project-next-action>span{display:none}.preview-tabs button{padding:8px;font-size:12px}.production-workspace .studio-preview-heading h3{font-size:15px}.compact-board .studio-shot{padding:12px}.compact-board .studio-shot.selected{padding:11px}}
 
 @media(min-width:901px){.production-workspace .studio-preview{width:min(100%,calc(max(180px,100dvh - 580px)*var(--preview-ratio,1.77778)));margin-inline:auto}}
+
+.studio-shot{cursor:pointer}.studio .scene-select-trigger{font:inherit;font-weight:inherit;color:inherit;background:transparent;border:0;padding:0;min-width:32px;text-align:left}.studio .scene-select-trigger:hover{background:#eaf0f7}.studio-shot:has(.scene-select-trigger:focus-visible){outline:2px solid #3268ba;outline-offset:2px}
