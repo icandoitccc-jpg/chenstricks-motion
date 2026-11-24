@@ -1,7 +1,7 @@
 name: Build and check Motion site
 on:
   push:
-    branches: [main, feature/image-layers, fix/production-flow-preview]
+    branches: [main, feature/image-layers, fix/production-flow-preview, fix/publish-runtime]
     paths: ['app/**', '.github/workflows/build-site.yml', '.github/workflows/project-ui.cjs']
 permissions:
   contents: write
@@ -25,7 +25,7 @@ jobs:
           MOTION_INFO_JOB_OUT=../jobs/info-verified.json npm run test:info
           npm run build
           npm install --no-save --ignore-scripts --no-audit --no-fund playwright
-          if [ "$GITHUB_REF" = 'refs/heads/main' ]; then npx playwright install --with-deps chromium; else npx playwright install chromium; fi
+          npx playwright install chromium
           mkdir -p "$HOME/.local/share/fonts"
           curl --fail --location --retry 2 --max-time 90 -o "$HOME/.local/share/fonts/NotoSansSC.ttf" 'https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/Variable/TTF/Subset/NotoSansSC-VF.ttf'
           fc-cache -f
