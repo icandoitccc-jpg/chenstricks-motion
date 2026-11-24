@@ -1,3 +1,4 @@
+import {sceneMediaIds} from '../lib/image-layers';
 import {imageTasks} from '../lib/visual-brief';
 import {AudioRoughCut} from '../components/AudioRoughCut';
 import { suggestAudioSync, applyAudioSync, type SyncRow } from '../lib/audio-alignment';
@@ -24,6 +25,8 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
   const [syncDraft,setSyncDraft]=useState<{rows:SyncRow[];cues:Sentence[];base:string}|null>(null);
   const syncBase=(p:Project)=>JSON.stringify([p.id,p.audioRevision,p.scriptRevision,p.sentences,p.scenes]);
   const [selected, setSelected] = useState('');
+  const previewPane = useRef<HTMLElement>(null);
+  const [previewTab,setPreviewTab]=useState<'preview'|'edit'|'media'>('preview');
   const [time, setTime] = useState(0); const [playing, setPlaying] = useState(false);
   const [notice, setNotice] = useState(''); const [saveStatus, setSaveStatus] = useState('正在读取本机项目…');
   const [busy, setBusy] = useState(false); const [cloudRepo, setCloudRepo] = useState('motion-render-private');
@@ -45,7 +48,7 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
     if (!d) { setNotice('找不到这个项目，请返回项目列表。'); return; }
     const p = prepareWorkflow(d.project); p.currentStep = resumeStep(p);
     projectRef.current = p; filesRef.current = new Map(d.files); cacheRef.current = d.cacheMedia ?? false;
-    setProject(p); setFiles(filesRef.current); setCacheMedia(cacheRef.current); setTab(p.currentStep); loaded.current = true;
+    setSelected(orderedScenes(p)[0]?.id??''); setProject(p); setFiles(filesRef.current); setCacheMedia(cacheRef.current); setTab(p.currentStep); loaded.current = true;
     setCloudLink(localStorage.getItem('motion.lastRun.' + p.id) ?? ''); setSaveStatus('已保存'); setReady(true);
   }).catch(e => { if (live) setNotice((e as Error).message); });
     return () => { live = false; audio.current?.pause(); abort.current?.abort(); if (loaded.current) void saveProject(projectRef.current, filesRef.current, cacheRef.current).catch(()=>{}); };
@@ -56,9 +59,13 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
   }, [project, files, ready, cacheMedia]);
   const goStep = async (step: ProjectStep) => {
     if (!canOpenStep(projectRef.current, step)) return;
+    if(step==='export'&&validateProject(projectRef.current,filesRef.current).some(i=>i.level==='error')){setNotice('先在分段制作中补齐缺少的素材或时间，再生成完整视频。');return;}
     audio.current?.pause(); previewEnd.current = null; previewQueue.current = [];
+    if(step==='scenes'){const id=projectRef.current.scenes.some(s=>s.id===selected)?selected:orderedScenes(projectRef.current)[0]?.id??'';setSelected(id);const t=compileScenes(projectRef.current).find(s=>s.id===id);if(t)setTime(t.start);}
     const next = { ...projectRef.current, currentStep: step }; projectRef.current = next;
     await saveProject(next, filesRef.current, cacheRef.current); setProject(next); setTab(step);
+    setNotice(''); setPlaying(false); setPreviewTab('preview');
+    requestAnimationFrame(()=>document.querySelector('.project-steps')?.scrollIntoView({block:'start'}));
   };
   const leave = async (path: string) => { audio.current?.pause(); await saveProject(projectRef.current, filesRef.current, cacheRef.current); window.location.hash = path; };
   const urls = useMemo(() => Object.fromEntries([...files].map(([id, f]) => [id, URL.createObjectURL(f)])), [files]);
@@ -72,7 +79,7 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
   useEffect(() => { frame.current?.contentWindow?.postMessage({type:'motion-media',files:[...files].filter(([id])=>project.assets.some(a=>a.id===id&&a.kind!=='audio'))},'*'); }, [files, project.assets, html, tab]);
   const notifyFrame = useCallback((t: number, isPlaying: boolean) => frame.current?.contentWindow?.postMessage({ type: 'motion-preview', time: t, playing: isPlaying }, '*'), []);
   useEffect(() => { notifyFrame(time, playing); }, [time, playing, html, notifyFrame]);
-  useEffect(() => { if (!playing) return; let id = 0, previous = 0; const tick = (now: number) => { if (now - previous > 100) { notifyFrame(audio.current?.currentTime ?? 0, true); previous = now; } id = requestAnimationFrame(tick); }; id = requestAnimationFrame(tick); return () => cancelAnimationFrame(id); }, [playing, notifyFrame]);
+  useEffect(() => { if (!playing) return; let id = 0, previous = 0; const tick = (now: number) => { if (now - previous > 30) { notifyFrame(audio.current?.currentTime ?? 0, true); previous = now; } id = requestAnimationFrame(tick); }; id = requestAnimationFrame(tick); return () => cancelAnimationFrame(id); }, [playing, notifyFrame]);
   const update = (patch: Partial<Project>) => { const next = { ...projectRef.current, ...patch }; projectRef.current = next; setProject(next); };
   const seek = (t: number) => { const value = Math.max(0, Math.min(duration, t)); if (audio.current) audio.current.currentTime = value; setTime(value); };
   const attempt = async (fn: () => Promise<void>) => { if (busy) return; setBusy(true); setNotice(''); try { await fn(); } catch (e) { setNotice((e as Error).message); } finally { setBusy(false); } };
@@ -126,10 +133,10 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
     if (previewEnd.current === null || value < previewEnd.current - .03) { setTime(value); return; }
     const next = previewQueue.current.shift();
     if (next) { const t = timed.find(s=>s.id === next)!; setSelected(next); previewEnd.current = t.end; seek(t.start); }
-    else { audio.current?.pause(); const end = previewEnd.current; previewEnd.current = null; seek(end); setPlaying(false); }
+    else { audio.current?.pause(); const end = previewEnd.current; previewEnd.current = null; seek(Math.max(0,end-.001)); setPlaying(false); }
   };
   const renderIds = async (ids: string[]) => {
-    if (!cloudConsent) { setNotice('请先在完整视频步骤的云端制作设置中确认私有仓库与免费用量。'); return; }
+    if (!cloudConsent) { setNotice('请先展开当前预览旁的「云端制作设置」，确认私有仓库与免费用量。'); return; }
     if (ids.length > 5) { setNotice('一次最多生成5段，避免不必要的云端消耗。请逐段制作，或先连续预览后直接生成完整视频。'); return; }
     if (!window.confirm(`将提交${ids.length}个云端渲染任务，逐个执行，使用 GitHub Actions 用量；不调用付费 AI。是否继续？`)) return;
     const controller = new AbortController(); abort.current = controller; setRenderingIds(ids); audio.current?.pause();
@@ -161,20 +168,51 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
     await saveProject(next, files, cacheMedia); setNotice('画面安排已导入。');
   };
   const stepIndex = steps.indexOf(tab);
+  const stepPurpose: Record<ProjectStep,string>={draft:'第1步：确认最终稿，保存后进入画面安排。',plan:'第2步：取得并采用画面方案。这里只安排内容；录音和素材在后面的步骤处理。',audio:'第3步：确认使用哪份录音，并核对画面与录音的时间。已匹配就直接下一步。',scenes:'第4步：补齐图片与录屏，逐段预览并调整。确认后进入完整视频。',export:'第5步：检查全片、生成并下载完整视频。'};
+  const nextHint=tab==='draft'?(hasDraft(project)?'终稿已保存':'先保存最终稿'):tab==='plan'?(hasPlan(project)?'方案已采用，接着确认录音':'先采用画面方案'):tab==='audio'?(hasTiming(project)?'时间已匹配，无需再次导入':'先确认录音与实际时间'):tab==='scenes'?(errors.length?'先补齐缺少的素材或时间，再进入全片':'预览确认后，下一步生成全片'):'';
+  const selectedReadiness=scene?sceneReadiness(project,scene.id,files):undefined;
+  const selectedTimed=timed.find(s=>s.id===selected);
+  const rangeStart=tab==='scenes'?(selectedTimed?.start??0):0;
+  const rangeEnd=tab==='scenes'?(selectedTimed?.end??duration):duration;
+  const needed=scene?sceneMediaIds(scene):[];
+  const cloudSettings=<details className="cloud-render-settings"><summary>云端制作设置</summary><label>私有渲染仓库<input value={cloudRepo} onChange={e=>setCloudRepo(e.target.value)}/></label><label className="studio-checkbox"><input type="checkbox" checked={cloudConsent} onChange={e=>setCloudConsent(e.target.checked)}/>允许上传到我的私有仓库，仅使用免费用量</label><a href="#/help">查看云端制作说明</a></details>;
+  const preview=<aside ref={previewPane} className="studio-preview-pane project-preview" aria-label={tab==='scenes'?'当前段落预览':'完整视频预览'}>
+    <div className="studio-preview-heading"><div><h2>{tab==='scenes'?'分段预览':'完整视频预览'}</h2>{tab==='scenes'&&scene&&<h3>{String(orderedScenes(project).findIndex(s=>s.id===selected)+1).padStart(2,'0')} · {scene.title}</h3>}</div></div>
+    <div className="studio-preview" style={{aspectRatio:`${project.width}/${project.height}`}}>
+      <iframe ref={frame} title="口播画面预览" sandbox="allow-scripts" srcDoc={html} onLoad={()=>{frame.current?.contentWindow?.postMessage({type:'motion-media',files:[...files].filter(([id])=>project.assets.some(a=>a.id===id&&a.kind!=='audio'))},'*');notifyFrame(time,playing);}}/>
+      {tab==='scenes'&&(!scene||!selectedReadiness?.ready)&&<div className="studio-preview-empty">{!scene?'选择一个段落开始预览':<div><p>{selectedReadiness?.errors[0]??'本幕尚不能预览'}</p><button onClick={()=>setPreviewTab('media')}>查看本段素材</button></div>}</div>}
+    </div>
+    <div className="preview-transport">
+      {tab==='scenes'&&<button className="primary" disabled={!selectedReadiness?.ready} onClick={()=>{if(playing){audio.current?.pause();setPlaying(false);}else startPreview([selected]);}}>{playing?'暂停':'播放本段'}</button>}
+      <div className="studio-playhead"><strong>{formatTime(tab==='scenes'?Math.max(0,time-rangeStart):time)}</strong><span>/ {formatTime(Math.max(0,rangeEnd-rangeStart))}</span></div>
+    </div>
+    <input className="studio-scrubber" aria-label="预览时间" type="range" min={rangeStart} max={Math.max(rangeStart+.001,rangeEnd-.001)} step=".01" disabled={tab==='scenes'&&!selectedReadiness?.ready} value={Math.max(rangeStart,Math.min(time,rangeEnd-.001))} onChange={e=>{previewQueue.current=[];previewEnd.current=tab==='scenes'?rangeEnd:null;seek(Number(e.target.value));}}/>
+    <audio ref={audio} controls={tab==='export'} preload="metadata" src={project.audioAssetId?urls[project.audioAssetId]:undefined} onTimeUpdate={e=>checkPreviewEnd(e.currentTarget.currentTime)} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);setTime(audio.current?.currentTime??0);}} onEnded={()=>setPlaying(false)}/>
+    {tab==='scenes'&&<>
+      <div className="preview-tabs" role="tablist" aria-label="本段操作">{(['preview','media','edit'] as const).map(t=><button role="tab" aria-selected={previewTab===t} key={t} onClick={()=>setPreviewTab(t)}>{t==='preview'?'预览与制作':t==='media'?'本段素材':'调整画面'}</button>)}</div>
+      {previewTab==='preview'&&<div className="preview-action-panel"><p className="studio-hint">{selectedTimed?`录音位置 ${formatTime(rangeStart)} → ${formatTime(rangeEnd)}。只播放这一段。`:'本段还没有有效的录音时间。'}</p><button disabled={!selectedReadiness?.ready||busy} onClick={()=>void attempt(()=>renderIds([selected]))}>生成本段 MP4</button>{cloudSettings}</div>}
+      {previewTab==='media'&&<section className="scene-media-panel" aria-label="本段素材"><h3>准备本段素材</h3><FileDrop label="image/png" accept="image/png,image/jpeg,image/webp,video/*" multiple disabled={busy} onFiles={files=>addFiles(files)}><label className="studio-file-button">添加素材<input type="file" multiple accept="image/png,image/jpeg,image/webp,video/*" onChange={e=>{void addFiles(e.target.files);e.target.value='';}}/></label></FileDrop><ul className="studio-assets">{project.assets.filter(a=>needed.includes(a.id)).map(a=><li key={a.id}><span>{a.kind==='video'?'录屏':'图片'}</span><div><strong>{a.name}</strong><small>{files.has(a.id)?'已连接':'待添加同名文件'}</small></div></li>)}</ul>{!needed.length&&<p>本段使用程序图解，不需要额外图片。</p>}<details><summary>全部项目素材</summary><ul className="studio-assets">{project.assets.filter(a=>a.kind!=='audio').map(a=><li key={a.id}><div><strong>{a.name}</strong><small>{files.has(a.id)?'已连接':'待添加同名文件'}</small></div><button onClick={()=>{update({assets:project.assets.filter(x=>x.id!==a.id)});setFiles(f=>{const n=new Map(f);n.delete(a.id);return n;});}}>移除</button></li>)}</ul></details><button disabled={!project.scenes.some(s=>s.kind==='image')} onClick={()=>saveBlob(new Blob([imageTasks(project)],{type:'text/markdown;charset=utf-8'}),'Motion_配图任务.md')}>下载配图任务清单</button></section>}
+      {previewTab==='edit'&&scene&&<SceneEditor key={scene.id} project={project} scene={scene} onChange={sceneChange} onDelete={()=>{update({scenes:project.scenes.filter(s=>s.id!==selected)});setSelected('');}} onDuplicate={addScene}/>}
+    </>}
+    {selected&&validOutputs[selected]&&<section className="studio-output"><h3>本段成片</h3><video controls src={validOutputs[selected].url}/><button onClick={()=>saveBlob(validOutputs[selected].blob,'motion-segment.mp4')}>下载本段视频</button></section>}
+    {validOutputs.full&&<section className="studio-output"><h3>完整视频</h3><video controls src={validOutputs.full.url}/><button onClick={()=>saveBlob(validOutputs.full.blob,'motion.mp4')}>下载完整视频</button></section>}
+  </aside>;
+
   return <div className="studio project-workspace">
     <a className="back-link" href="#/projects" onClick={e=>{e.preventDefault();void attempt(()=>leave('#/projects'));}}>← 返回项目列表</a>
     <header className="studio-header"><h1>{ready ? project.title : '读取项目'}</h1><div className="studio-header-actions"><span className="project-save-status" role="status">{saveStatus}</span>
     <details className="project-options"><summary>项目选项</summary><div className="project-options-panel"><label>项目名称<input aria-label="项目名称" value={project.title} onChange={e=>update({title:e.target.value})}/></label><button disabled={busy} onClick={()=>void attempt(()=>exportZip(false))}>下载项目备份</button><label className="studio-checkbox"><input type="checkbox" checked={cacheMedia} onChange={e=>setCacheMedia(e.target.checked)}/>保留原始素材供下次编辑</label><button onClick={()=>{setCacheMedia(false);setNotice('已关闭素材缓存。');}}>清除素材缓存</button><a href="#/help">查看存储说明</a></div></details></div></header>
     {notice && <div className="studio-notice" role="status">{notice}</div>}
     {ready && <>
-    <nav className="project-steps" aria-label="制作步骤">{steps.map((step,i)=><button disabled={busy || !canOpenStep(project,step)} key={step} aria-current={tab===step?'step':undefined} onClick={()=>void attempt(()=>goStep(step))}><span>{i+1}</span>{stepLabels[step]}</button>)}</nav>
+    <nav className="project-steps" aria-label="制作步骤">{steps.map((step,i)=><button disabled={busy || !canOpenStep(project,step) || (step==='export'&&errors.length>0)} key={step} aria-current={tab===step?'step':undefined} onClick={()=>void attempt(()=>goStep(step))}><span>{i+1}</span>{stepLabels[step]}</button>)}</nav>
+    <p className="project-step-purpose" role="note">{stepPurpose[tab]}</p>
     <fieldset disabled={busy} className="studio-working-fields">
     {tab==='draft' && <section className="draft-step"><div className="studio-section-heading"><h2>最终稿</h2><FileDrop label=".pdf" accept=".pdf,.docx,.txt,.md" disabled={busy} onFiles={files=>attempt(()=>uploadDraft(files[0]))}><label className="studio-file-button">{project.scriptText?'更换稿件':'上传终稿'}<input type="file" accept=".pdf,.docx,.txt,.md" onChange={readFile(uploadDraft)}/></label></FileDrop></div>
       {project.scriptFileName && <p className="draft-filename">{project.scriptFileName}</p>}
       <textarea aria-label="最终稿" rows={18} value={project.draftText??''} onChange={e=>update({draftText:e.target.value})}/>
       <div className="draft-footer"><span>{hasDraft(project)?'终稿已保存':'终稿修改中'}</span><button disabled={!project.draftText?.trim() || hasDraft(project)} onClick={()=>void attempt(saveDraft)}>保存终稿</button></div>
     </section>}
-    {tab==='plan' && <section><details className="visual-style-panel"><summary>统一画面风格与配图</summary><label>全片画面风格<textarea aria-label="全片画面风格" value={project.visualStyle??''} placeholder="例如：暖白纸张质感、蓝黄手绘、便签与桌面；背景和元素保持同一参考图风格。" onChange={e=>update({visualStyle:e.target.value})}/></label><button disabled={!project.scenes.some(s=>s.kind==='image')} onClick={()=>saveBlob(new Blob([imageTasks(project)],{type:'text/markdown;charset=utf-8'}),'Motion_配图任务.md')}>下载配图任务清单</button>{!project.scenes.some(s=>s.kind==='image')&&<p className="studio-hint">当前还没有图片画面。先让 Agent 按终稿策划背景和图片元素，再下载逐幕配图任务。</p>}<FileDrop label="配图素材" accept="image/png,image/jpeg,image/webp" multiple disabled={busy} onFiles={files=>addFiles(files,false)}><label className="studio-file-button">上传配图<input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={e=>{void addFiles(e.target.files,false);e.target.value='';}}/></label></FileDrop>{project.assets.filter(a=>a.kind==='image').map(a=><p key={a.id} className="studio-hint">{a.name} · {a.id} · {files.has(a.id)?'已连接':'待连接'}</p>)}</details><AgentHandoff key={project.id} project={project} onApply={async next=>{clearOutputs();projectRef.current=next;setProject(next);setSelected(next.scenes[0]?.id??'');await saveProject(next,filesRef.current,cacheRef.current);}}/><div className="studio-section-heading"><h2>画面安排</h2><details className="plan-file-import"><summary>从文件导入制作总表</summary><div className="studio-actions"><FileDrop label=".json" accept=".json" disabled={busy} onFiles={files=>attempt(()=>importPlan(files[0]))}><label className="studio-file-button prominent">导入制作总表<input type="file" accept=".json" onChange={readFile(importPlan)}/></label></FileDrop></div></details></div>
+    {tab==='plan' && <section><details className="visual-style-panel"><summary>统一画面风格与配图</summary><label>全片画面风格<textarea aria-label="全片画面风格" value={project.visualStyle??''} placeholder="人物、环境和配色保持同一参考图风格。" onChange={e=>update({visualStyle:e.target.value})}/></label><button disabled={!project.scenes.some(s=>s.kind==='image')} onClick={()=>saveBlob(new Blob([imageTasks(project)],{type:'text/markdown;charset=utf-8'}),'Motion_配图任务.md')}>下载配图任务清单</button>{!project.scenes.some(s=>s.kind==='image')&&<p className="studio-hint">当前还没有图片画面。先让 Agent 按终稿策划背景和图片元素，再下载逐幕配图任务。</p>}</details><AgentHandoff key={project.id} project={project} onApply={async next=>{clearOutputs();projectRef.current=next;setProject(next);setSelected(next.scenes[0]?.id??'');await saveProject(next,filesRef.current,cacheRef.current);}}/><div className="studio-section-heading"><h2>画面安排</h2><details className="plan-file-import"><summary>从文件导入制作总表</summary><div className="studio-actions"><FileDrop label=".json" accept=".json" disabled={busy} onFiles={files=>attempt(()=>importPlan(files[0]))}><label className="studio-file-button prominent">导入制作总表<input type="file" accept=".json" onChange={readFile(importPlan)}/></label></FileDrop></div></details></div>
       {!project.scenes.length && <div className="step-empty"><p>还没有画面安排。</p><a href="#/help">如何准备制作总表？</a></div>}
       {!!project.scenes.length && <SceneBoard project={project} files={files} selected={selected} busy={busy} planning generated={new Set()} onSelect={setSelected} onBatch={()=>{}} onRender={()=>{}}/>}
       {scene && <details className="scene-edit-options"><summary>修改这一段的画面安排</summary><SceneEditor project={project} scene={scene} onChange={sceneChange} onDelete={()=>{update({scenes:project.scenes.filter(s=>s.id!==selected)});setSelected('');}} onDuplicate={()=>{const copy={...scene,id:uid('scene'),sentenceIds:[]};update({scenes:[...project.scenes,copy]});setSelected(copy.id);}}/></details>}
@@ -189,24 +227,23 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
       <details><summary>调整各句与录音的位置</summary><div className="studio-transcript">{project.sentences.map(s=><div className="studio-sentence" key={s.id}><div className="studio-sentence-id">{s.id}</div><p>{s.text}</p><div className="studio-time-fields"><label>开始（秒）<input aria-label={`${s.id}开始`} type="number" min="0" step=".01" value={s.start??''} onChange={e=>sentenceChange(s.id,{start:e.target.value===''?null:Number(e.target.value)})}/></label><button disabled={!files.has(project.audioAssetId!)} onClick={()=>sentenceChange(s.id,{start:Number(time.toFixed(2))})}>用当前播放位置</button><label>结束（秒）<input aria-label={`${s.id}结束`} type="number" min="0" step=".01" value={s.end??''} onChange={e=>sentenceChange(s.id,{end:e.target.value===''?null:Number(e.target.value)})}/></label><button disabled={!files.has(project.audioAssetId!)} onClick={()=>sentenceChange(s.id,{end:Number(time.toFixed(2))})}>用当前播放位置</button></div></div>)}</div></details>
       </>}
     </section>}
-    {tab==='scenes' && <>
-      <SceneBoard project={project} files={files} selected={selected} busy={busy} generated={new Set(Object.keys(validOutputs))} onSelect={id=>{setSelected(id);if(sceneReadiness(project,id,files).ready)startPreview([id]);}} onBatch={()=>startPreview(orderedScenes(project).map(s=>s.id))} onRender={ids=>void attempt(()=>renderIds(ids))}/>
-      <section className="studio-section"><div className="studio-section-heading"><h2>图片与录屏</h2><FileDrop label="image/png" accept="image/png,image/jpeg,image/webp,video/*" multiple disabled={busy} onFiles={files=>addFiles(files)}><label className="studio-file-button">添加素材<input type="file" multiple accept="image/png,image/jpeg,image/webp,video/*" onChange={e=>{void addFiles(e.target.files);e.target.value='';}}/></label></FileDrop></div><ul className="studio-assets">{project.assets.filter(a=>a.kind!=='audio').map(a=><li key={a.id}><span>{a.kind==='video'?'录屏':'图片'}</span><div><strong>{a.name}</strong><small>{files.has(a.id)?'已连接':'待添加同名文件'}</small></div><button onClick={()=>{update({assets:project.assets.filter(x=>x.id!==a.id)});setFiles(f=>{const n=new Map(f);n.delete(a.id);return n;});}}>移除</button></li>)}</ul></section>
-      {scene && <details className="scene-edit-options"><summary>修改当前画面</summary><SceneEditor project={project} scene={scene} onChange={sceneChange} onDelete={()=>{update({scenes:project.scenes.filter(s=>s.id!==selected)});setSelected('');}} onDuplicate={addScene}/></details>}
-    </>}
-    {(tab==='scenes'||tab==='export') && <aside className="studio-preview-pane project-preview"><h2>{tab==='scenes'?'分段预览':'完整视频预览'}</h2><div className="studio-preview" style={{aspectRatio:`${project.width}/${project.height}`}}><iframe ref={frame} title="口播画面预览" sandbox="allow-scripts" srcDoc={html} onLoad={()=>{frame.current?.contentWindow?.postMessage({type:'motion-media',files:[...files].filter(([id])=>project.assets.some(a=>a.id===id&&a.kind!=='audio'))},'*');notifyFrame(time,playing);}}/></div><div className="studio-playhead"><strong>{formatTime(time)}</strong><span>/ {formatTime(duration)}</span></div><input className="studio-scrubber" aria-label="预览时间" type="range" min="0" max={duration||1} step=".05" value={Math.min(time,duration||1)} onChange={e=>{previewEnd.current=null;previewQueue.current=[];seek(Number(e.target.value));}}/><audio ref={audio} controls preload="metadata" src={project.audioAssetId?urls[project.audioAssetId]:undefined} onTimeUpdate={e=>checkPreviewEnd(e.currentTarget.currentTime)} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);setTime(audio.current?.currentTime??0);}} onEnded={()=>setPlaying(false)}/>
-      {selected && validOutputs[selected] && <section className="studio-output"><h3>本段成片</h3><video controls src={validOutputs[selected].url}/><button onClick={()=>saveBlob(validOutputs[selected].blob,'motion-segment.mp4')}>下载本段视频</button></section>}
-      {validOutputs.full && <section className="studio-output"><h3>完整视频</h3><video controls src={validOutputs.full.url}/><button onClick={()=>saveBlob(validOutputs.full.blob,'motion.mp4')}>下载完整视频</button></section>}
-    </aside>}
+    {tab==='scenes' && <div className="production-workspace">
+      <section className="production-scenes-list" aria-label="分段列表">
+        <p className="step-help">选择左侧段落，在右侧预览。缺素材时，在右侧补齐后继续。</p>
+        <SceneBoard compact project={project} files={files} selected={selected} busy={busy} generated={new Set(Object.keys(validOutputs))} onSelect={id=>{setSelected(id);setPreviewTab(sceneReadiness(project,id,files).ready?'preview':'media');audio.current?.pause();setPlaying(false);previewEnd.current=null;previewQueue.current=[];const t=timed.find(s=>s.id===id);if(t)seek(t.start);if(window.matchMedia('(max-width: 900px)').matches)requestAnimationFrame(()=>previewPane.current?.scrollIntoView({block:'start',behavior:'smooth'}));}} onBatch={()=>{setPreviewTab('preview');startPreview(orderedScenes(project).map(s=>s.id));if(window.matchMedia('(max-width: 900px)').matches)previewPane.current?.scrollIntoView({block:'start'});}} onRender={ids=>void attempt(()=>renderIds(ids))}/>
+      </section>
+      {preview}
+    </div>}
+    {tab==='export' && preview}
     {tab==='export' && <section className="export-step"><div className="studio-fields"><label>画幅<select value={project.width} onChange={e=>update(e.target.value==='1920'?{width:1920,height:1080}:{width:1080,height:1920})}><option value="1920">横屏 16:9</option><option value="1080">竖屏 9:16</option></select></label><label className="studio-checkbox"><input type="checkbox" checked={project.captions} onChange={e=>update({captions:e.target.checked})}/>显示字幕</label></div>
       {!!errors.length && <div className="studio-notice"><strong>生成前还需要处理</strong><ul>{errors.slice(0,8).map((e,i)=><li key={i}>{e.message}</li>)}</ul></div>}
-      <details><summary>云端制作设置</summary><label>私有渲染仓库<input value={cloudRepo} onChange={e=>setCloudRepo(e.target.value)}/></label><label className="studio-checkbox"><input type="checkbox" checked={cloudConsent} onChange={e=>setCloudConsent(e.target.checked)}/>允许上传到我的私有仓库，仅使用免费用量</label><a href="#/help">查看云端制作说明</a></details>
+      {cloudSettings}
       <button className="primary" disabled={errors.length>0} onClick={()=>void attempt(()=>renderIds(['full']))}>生成完整视频</button>
       {cloudLink && <p><a target="_blank" rel="noreferrer" href={cloudLink}>查看最近制作任务</a></p>}
     </section>}
     </fieldset>
     <footer className="project-step-footer"><button disabled={busy} onClick={()=>void attempt(()=>stepIndex>0?goStep(steps[stepIndex-1]):leave('#/projects'))}>{stepIndex>0?'← 上一步':'← 返回项目列表'}</button>
-      {stepIndex<steps.length-1 && <button className="primary" disabled={busy||!canOpenStep(project,steps[stepIndex+1])} onClick={()=>void attempt(()=>goStep(steps[stepIndex+1]))}>下一步：{stepLabels[steps[stepIndex+1]]} →</button>}
+      {stepIndex<steps.length-1 && <div className="project-next-action"><span>{nextHint}</span><button className="primary" disabled={busy||!canOpenStep(project,steps[stepIndex+1])||(tab==='scenes'&&errors.length>0)} onClick={()=>void attempt(()=>goStep(steps[stepIndex+1]))}>下一步：{stepLabels[steps[stepIndex+1]]} →</button></div>}
     </footer>
     </>}
     {busy && abort.current && <div className="studio-notice">云端制作中<button onClick={()=>abort.current?.abort()}>停止等待及后续队列</button></div>}
