@@ -178,7 +178,7 @@ export const Studio: React.FC<{projectId: string}> = ({projectId}) => {
   const cloudSettings=<details className="cloud-render-settings"><summary>云端制作设置</summary><label>私有渲染仓库<input value={cloudRepo} onChange={e=>setCloudRepo(e.target.value)}/></label><label className="studio-checkbox"><input type="checkbox" checked={cloudConsent} onChange={e=>setCloudConsent(e.target.checked)}/>允许上传到我的私有仓库，仅使用免费用量</label><a href="#/help">查看云端制作说明</a></details>;
   const preview=<aside ref={previewPane} className="studio-preview-pane project-preview" aria-label={tab==='scenes'?'当前段落预览':'完整视频预览'}>
     <div className="studio-preview-heading"><div><h2>{tab==='scenes'?'分段预览':'完整视频预览'}</h2>{tab==='scenes'&&scene&&<h3>{String(orderedScenes(project).findIndex(s=>s.id===selected)+1).padStart(2,'0')} · {scene.title}</h3>}</div></div>
-    <div className="studio-preview" style={{aspectRatio:`${project.width}/${project.height}`}}>
+    <div className="studio-preview" style={{aspectRatio:`${project.width}/${project.height}`,'--preview-ratio':project.width/project.height} as React.CSSProperties}>
       <iframe ref={frame} title="口播画面预览" sandbox="allow-scripts" srcDoc={html} onLoad={()=>{frame.current?.contentWindow?.postMessage({type:'motion-media',files:[...files].filter(([id])=>project.assets.some(a=>a.id===id&&a.kind!=='audio'))},'*');notifyFrame(time,playing);}}/>
       {tab==='scenes'&&(!scene||!selectedReadiness?.ready)&&<div className="studio-preview-empty">{!scene?'选择一个段落开始预览':<div><p>{selectedReadiness?.errors[0]??'本幕尚不能预览'}</p><button onClick={()=>setPreviewTab('media')}>查看本段素材</button></div>}</div>}
     </div>
